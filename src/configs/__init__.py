@@ -1,7 +1,5 @@
-
 from .bisenetv1 import cfg as bisenetv1_cfg
 from .bisenetv2 import cfg as bisenetv2_cfg
-
 
 
 class cfg_dict(object):

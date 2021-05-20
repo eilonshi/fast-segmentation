@@ -2,12 +2,12 @@
 # -*- encoding: utf-8 -*-
 
 import sys
+
 sys.path.insert(0, '')
 import os
 import os.path as osp
 import random
 import logging
-import time
 import argparse
 import numpy as np
 from tabulate import tabulate
@@ -15,18 +15,16 @@ from tabulate import tabulate
 import torch
 import torch.nn as nn
 import torch.distributed as dist
-from torch.utils.data import DataLoader
 import torch.cuda.amp as amp
 
-from lib.models import model_factory
-from configs import cfg_factory
-from lib.cityscapes_cv2 import get_data_loader
+from src.lib.models import model_factory
+from src.configs import cfg_factory
+from src.lib.cityscapes_cv2 import get_data_loader
 from evaluate import eval_model
-from lib.ohem_ce_loss import OhemCELoss
-from lib.lr_scheduler import WarmupPolyLrScheduler
-from lib.meters import TimeMeter, AvgMeter
-from lib.logger import setup_logger, print_log_msg
-
+from src.lib.ohem_ce_loss import OhemCELoss
+from src.lib.lr_scheduler import WarmupPolyLrScheduler
+from src.lib.meters import TimeMeter, AvgMeter
+from src.lib.logger import setup_logger, print_log_msg
 
 ## fix all random seeds
 torch.manual_seed(123)
@@ -34,30 +32,32 @@ torch.cuda.manual_seed(123)
 np.random.seed(123)
 random.seed(123)
 torch.backends.cudnn.deterministic = True
+
+
 #  torch.backends.cudnn.benchmark = True
 #  torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-
-
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--local_rank', dest='local_rank', type=int, default=-1,)
-    parse.add_argument('--port', dest='port', type=int, default=44554,)
-    parse.add_argument('--model', dest='model', type=str, default='bisenetv2',)
-    parse.add_argument('--finetune-from', type=str, default=None,)
+    parse.add_argument('--local_rank', dest='local_rank', type=int, default=-1, )
+    parse.add_argument('--port', dest='port', type=int, default=44554, )
+    parse.add_argument('--model', dest='model', type=str, default='bisenetv2', )
+    parse.add_argument('--finetune-from', type=str, default='models/model_final_v2.pth', )
     return parse.parse_args()
+
 
 args = parse_args()
 cfg = cfg_factory[args.model]
 
 
-
 def set_model():
     net = model_factory[cfg.model_type](19)
+
     if not args.finetune_from is None:
         net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
-    if cfg.use_sync_bn: net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
+    if cfg.use_sync_bn:
+        net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
     net.cuda()
     net.train()
     criteria_pre = OhemCELoss(0.7)
@@ -109,9 +109,8 @@ def set_meters():
     loss_meter = AvgMeter('loss')
     loss_pre_meter = AvgMeter('loss_prem')
     loss_aux_meters = [AvgMeter('loss_aux{}'.format(i))
-            for i in range(cfg.num_aux_heads)]
+                       for i in range(cfg.num_aux_heads)]
     return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
-
 
 
 def train():
@@ -120,9 +119,8 @@ def train():
 
     ## dataset
     dl = get_data_loader(
-            cfg.im_root, cfg.train_im_anns,
-            cfg.ims_per_gpu, cfg.scales, cfg.cropsize,
-            cfg.max_iter, mode='train', distributed=is_dist)
+        cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.cropsize, cfg.max_iter, mode='train',
+        distributed=is_dist)
 
     ## model
     net, criteria_pre, criteria_aux = set_model()
@@ -141,8 +139,8 @@ def train():
 
     ## lr scheduler
     lr_schdr = WarmupPolyLrScheduler(optim, power=0.9,
-        max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
-        warmup_ratio=0.1, warmup='exp', last_epoch=-1,)
+                                     max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
+                                     warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
 
     ## train loop
     for it, (im, lb) in enumerate(dl):

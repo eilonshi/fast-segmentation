@@ -4,7 +4,7 @@
 
 from logger import setup_logger
 from model import BiSeNet
-from cityscapes import CityScapes
+from cityscapes import Cityscapes
 from loss import OhemCELoss
 from evaluate import evaluate
 from optimizer import Optimizer
@@ -62,7 +62,7 @@ def train():
     n_workers = 4
     cropsize = [1024, 1024]
     #  cropsize = [1024, 512]
-    ds = CityScapes('./data', cropsize=cropsize, mode='train')
+    ds = Cityscapes('./data', cropsize=cropsize, mode='train')
     sampler = torch.utils.data.distributed.DistributedSampler(ds)
     dl = DataLoader(ds,
                     batch_size = n_img_per_gpu,

@@ -11,18 +11,16 @@ import math
 from tabulate import tabulate
 
 from tqdm import tqdm
-import numpy as np
-import cv2
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
 
-from lib.models import model_factory
-from configs import cfg_factory
-from lib.logger import setup_logger
-from lib.cityscapes_cv2 import get_data_loader
+from src.lib.models import model_factory
+from src.configs import cfg_factory
+from src.lib.logger import setup_logger
+from src.lib.cityscapes_cv2 import get_data_loader
 
 
 

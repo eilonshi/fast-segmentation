@@ -1,13 +1,12 @@
 import argparse
-import os.path as osp
 import sys
 sys.path.insert(0, '')
 
 import torch
 from torch2trt import torch2trt
 
-from lib.models import model_factory
-from configs import cfg_factory
+from src.lib.models import model_factory
+from src.configs import cfg_factory
 
 torch.set_grad_enabled(False)
 

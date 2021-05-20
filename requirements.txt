@@ -1,0 +1,7 @@
+torchvision~=0.8.2
+opencv-python~=4.5.1.48
+numpy~=1.19.4
+tqdm~=4.54.1
+matplotlib~=3.3.2
+tabulate~=0.8.9
+pillow~=8.1.0

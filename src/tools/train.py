@@ -16,14 +16,14 @@ import torch
 import torch.nn as nn
 import torch.distributed as dist
 
-from lib.models import model_factory
-from configs import cfg_factory
-from lib.cityscapes_cv2 import get_data_loader
+from src.lib.models import model_factory
+from src.configs import cfg_factory
+from src.lib.cityscapes_cv2 import get_data_loader
 from src.tools.evaluate import eval_model
-from lib.ohem_ce_loss import OhemCELoss
-from lib.lr_scheduler import WarmupPolyLrScheduler
-from lib.meters import TimeMeter, AvgMeter
-from lib.logger import setup_logger, print_log_msg
+from src.lib.ohem_ce_loss import OhemCELoss
+from src.lib.lr_scheduler import WarmupPolyLrScheduler
+from src.lib.meters import TimeMeter, AvgMeter
+from src.lib.logger import setup_logger, print_log_msg
 
 # apex
 has_apex = True
@@ -57,7 +57,7 @@ args = parse_args()
 cfg = cfg_factory[args.model]
 
 
-def set_model(x):
+def set_model():
 
     net = model_factory[cfg.model_type](19)
     if args.finetune_from is not None:

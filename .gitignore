@@ -108,7 +108,11 @@ data
 data/
 play.py
 preprocess_data.py
-res/
+logs/
 adj.md
-tensorrt/build/*
+src/tensorrt/build/*
 
+
+# images
+*.png
+*.jpg

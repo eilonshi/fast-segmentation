@@ -7,9 +7,9 @@ import torch
 import numpy as np
 import cv2
 
-import lib.transform_cv2 as T
-from lib.models import model_factory
-from configs import cfg_factory
+from src import lib as T
+from src.lib.models import model_factory
+from src.configs import cfg_factory
 import time
 
 torch.set_grad_enabled(False)

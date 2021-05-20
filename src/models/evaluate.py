@@ -3,7 +3,7 @@
 
 from logger import setup_logger
 from model import BiSeNet
-from cityscapes import CityScapes
+from cityscapes import Cityscapes
 
 import torch
 import torch.nn as nn
@@ -161,7 +161,7 @@ def evaluate(respth='./res', dspth='./data'):
     ## dataset
     batchsize = 5
     n_workers = 2
-    dsval = CityScapes(dspth, mode='val')
+    dsval = Cityscapes(dspth, mode='val')
     dl = DataLoader(dsval,
                     batch_size = batchsize,
                     shuffle = False,

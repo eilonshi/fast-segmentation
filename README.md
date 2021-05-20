@@ -11,7 +11,7 @@ The mIOU evaluation result of the models trained and evaluated on cityscapes tra
 
 > Where **ss** means single scale evaluation, **ssc** means single scale crop evaluation, **msf** means multi-scale evaluation with flip augment, and **mscf** means multi-scale crop evaluation with flip evaluation. The eval scales of multi-scales evaluation are `[0.5, 0.75, 1.0, 1.25, 1.5, 1.75]`, and the crop size of crop evaluation is `[1024, 1024]`.
 
-> The fps is tested in different way from the paper. For more information, please see [here](./tensorrt).
+> The fps is tested in different way from the paper. For more information, please see [here](src/tensorrt).
 
 Note that the model has a big variance, which means that the results of training for many times would vary within a relatively big margin. For example, if you train bisenetv2 for many times, you will observe that the result of **ss** evaluation of bisenetv2 varies between 72.1-74.4. 
 
@@ -91,7 +91,7 @@ $ python tools/evaluate.py --model bisenetv1 --weight-path /path/to/your/weight.
 ```
 
 ## Infer with tensorrt
-You can go to [tensorrt](./tensorrt) For details.
+You can go to [tensorrt](src/tensorrt) For details.
 
 
 ### Be aware that this is the refactored version of the original codebase. You can go to the `old` directory for original implementation.

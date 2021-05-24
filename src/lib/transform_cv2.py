@@ -10,11 +10,11 @@ import cv2
 import torch
 
 
-
 class RandomResizedCrop(object):
     '''
     size should be a tuple of (H, W)
     '''
+
     def __init__(self, scales=(0.5, 1.), size=(384, 384)):
         self.scales = scales
         self.size = size
@@ -24,7 +24,7 @@ class RandomResizedCrop(object):
             return im_lb
 
         im, lb = im_lb['im'], im_lb['lb']
-        assert im.shape[:2] == lb.shape[:2]
+        assert im.shape[:2] == lb.shape[:2], f'image shape is {im.shape}, label shape is {lb.shape}'
 
         crop_h, crop_w = self.size
         scale = np.random.uniform(min(self.scales), max(self.scales))
@@ -32,7 +32,8 @@ class RandomResizedCrop(object):
         im = cv2.resize(im, (im_w, im_h))
         lb = cv2.resize(lb, (im_w, im_h), interpolation=cv2.INTER_NEAREST)
 
-        if (im_h, im_w) == (crop_h, crop_w): return dict(im=im, lb=lb)
+        if (im_h, im_w) == (crop_h, crop_w):
+            return dict(im=im, lb=lb)
         pad_h, pad_w = 0, 0
         if im_h < crop_h:
             pad_h = (crop_h - im_h) // 2 + 1
@@ -46,10 +47,9 @@ class RandomResizedCrop(object):
         sh, sw = np.random.random(2)
         sh, sw = int(sh * (im_h - crop_h)), int(sw * (im_w - crop_w))
         return dict(
-            im=im[sh:sh+crop_h, sw:sw+crop_w, :].copy(),
-            lb=lb[sh:sh+crop_h, sw:sw+crop_w].copy()
+            im=im[sh:sh + crop_h, sw:sw + crop_w, :].copy(),
+            lb=lb[sh:sh + crop_h, sw:sw + crop_w].copy()
         )
-
 
 
 class RandomHorizontalFlip(object):
@@ -68,16 +68,15 @@ class RandomHorizontalFlip(object):
         )
 
 
-
 class ColorJitter(object):
 
     def __init__(self, brightness=None, contrast=None, saturation=None):
         if not brightness is None and brightness >= 0:
-            self.brightness = [max(1-brightness, 0), 1+brightness]
+            self.brightness = [max(1 - brightness, 0), 1 + brightness]
         if not contrast is None and contrast >= 0:
-            self.contrast = [max(1-contrast, 0), 1+contrast]
+            self.contrast = [max(1 - contrast, 0), 1 + contrast]
         if not saturation is None and saturation >= 0:
-            self.saturation = [max(1-saturation, 0), 1+saturation]
+            self.saturation = [max(1 - saturation, 0), 1 + saturation]
 
     def __call__(self, im_lb):
         im, lb = im_lb['im'], im_lb['lb']
@@ -91,16 +90,16 @@ class ColorJitter(object):
         if not self.saturation is None:
             rate = np.random.uniform(*self.saturation)
             im = self.adj_saturation(im, rate)
-        return dict(im=im, lb=lb,)
+        return dict(im=im, lb=lb, )
 
     def adj_saturation(self, im, rate):
         M = np.float32([
-            [1+2*rate, 1-rate, 1-rate],
-            [1-rate, 1+2*rate, 1-rate],
-            [1-rate, 1-rate, 1+2*rate]
+            [1 + 2 * rate, 1 - rate, 1 - rate],
+            [1 - rate, 1 + 2 * rate, 1 - rate],
+            [1 - rate, 1 - rate, 1 + 2 * rate]
         ])
         shape = im.shape
-        im = np.matmul(im.reshape(-1, 3), M).reshape(shape)/3
+        im = np.matmul(im.reshape(-1, 3), M).reshape(shape) / 3
         im = np.clip(im, 0, 255).astype(np.uint8)
         return im
 
@@ -117,12 +116,11 @@ class ColorJitter(object):
         return table[im]
 
 
-
-
 class ToTensor(object):
     '''
     mean and std should be of the channel order 'bgr'
     '''
+
     def __init__(self, mean=(0, 0, 0), std=(1., 1., 1.)):
         self.mean = mean
         self.std = std
@@ -151,8 +149,5 @@ class Compose(object):
         return im_lb
 
 
-
-
 if __name__ == '__main__':
     pass
-

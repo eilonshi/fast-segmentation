@@ -34,7 +34,11 @@ class BaseDataset(Dataset):
 
     def __getitem__(self, idx):
         impth, lbpth = self.img_paths[idx], self.lb_paths[idx]
+        assert cv2.imread(impth) is not None
+        assert cv2.imread(lbpth, 0) is not None
         img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
+        assert img.shape[:2] == label.shape[:2], f'image: {impth}, label: {lbpth}\n' \
+                                                 f'image shape: {img.shape}, label shape: {label.shape}'
         if not self.lb_map is None:
             label = self.lb_map[label]
         im_lb = dict(im=img, lb=label)

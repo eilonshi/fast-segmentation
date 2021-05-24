@@ -103,15 +103,15 @@ venv.bak/
 .mypy_cache/
 
 
-## Coin: 
-data
-data/
+## Coin:
 play.py
 preprocess_data.py
-logs/
 adj.md
 src/tensorrt/build/*
 
+
+# weights
+*.pth
 
 # images
 *.png

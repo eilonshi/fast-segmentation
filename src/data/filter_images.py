@@ -1,12 +1,12 @@
 import os
 import cv2
 import numpy as np
-import shutil
 from pathlib import Path
 import random
+import shutil
 
 from consts import OTHER_LABEL, BUILDING_LABEL, MAPPING_DICT_ADE, IRRELEVANT_LABELS_ADE, MAPPING_DICT_CITYSCAPES, \
-    IRRELEVANT_LABELS_CITYSCAPES, MAPPING_DICT_BARAK, IRRELEVANT_LABELS_BARAK, TEVEL_SHAPE
+    IRRELEVANT_LABELS_CITYSCAPES, MAPPING_DICT_BARAK, IRRELEVANT_LABELS_BARAK, TRAIN_PERCENT, VAL_PERCENT, TEST_PERCENT
 
 
 def filter_data_folder(mapping_dict_, irrelevant_labels_, old_ann_folder_, new_ann_folder_, old_img_folder_,
@@ -44,7 +44,6 @@ def filter_data_folder(mapping_dict_, irrelevant_labels_, old_ann_folder_, new_a
             relevant_images_counter += 1
             print(relevant_images_counter)
             new_path = os.path.join(new_ann_folder_, filename)
-            # new_ann = cv2.resize(new_ann, TEVEL_SHAPE)
             cv2.imwrite(new_path, new_ann)
 
             # copy the image of the annotation
@@ -57,11 +56,8 @@ def filter_data_folder(mapping_dict_, irrelevant_labels_, old_ann_folder_, new_a
                 img_old_path = img_old_path.replace('png', 'JPG')
                 img_old_path = img_old_path.replace('_w', '')
 
-            # resize and save
-            old_img = cv2.imread(img_old_path)
-            # old_img = cv2.resize(old_img, TEVEL_SHAPE)
             img_new_path = os.path.join(new_img_folder_, filename)
-            cv2.imwrite(img_new_path, old_img)
+            shutil.copy(img_old_path, img_new_path)
 
     print(f'There are {image_counter} images in the {old_img_folder_} data-set, {relevant_images_counter} of them are '
           f'relevant')
@@ -152,4 +148,4 @@ if __name__ == '__main__':
     ]
 
     create_train_val_test_txt_files(output_path=base_path, data_directories=data_dirs,
-                                    train_val_test_ratio=[0.7, 0.2, 0.1])
+                                    train_val_test_ratio=[TRAIN_PERCENT, VAL_PERCENT, TEST_PERCENT])

@@ -9,6 +9,7 @@ import torchvision
 
 from resnet import Resnet18
 from modules.bn import InPlaceABNSync as BatchNorm2d
+from src.tools.consts import NUM_CLASSES
 
 
 class ConvBNReLU(nn.Module):
@@ -273,7 +274,7 @@ class BiSeNet(nn.Module):
 
 
 if __name__ == "__main__":
-    net = BiSeNet(19)
+    net = BiSeNet(NUM_CLASSES)
     net.cuda()
     net.eval()
     in_ten = torch.randn(16, 3, 640, 480).cuda()

@@ -1,8 +1,4 @@
-#!/usr/bin/python
-# -*- encoding: utf-8 -*-
-
 import os.path as osp
-
 from torch.utils.data import Dataset
 import cv2
 
@@ -10,10 +6,8 @@ from src.lib import transform_cv2 as T
 
 
 class BaseDataset(Dataset):
-    '''
-    '''
 
-    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
+    def __init__(self, data_root, ann_path, trans_func=None, mode='train'):
         super(BaseDataset, self).__init__()
         assert mode in ('train', 'val', 'test')
         self.mode = mode
@@ -21,32 +15,32 @@ class BaseDataset(Dataset):
 
         self.lb_map = None
 
-        with open(annpath, 'r') as fr:
+        with open(ann_path, 'r') as fr:
             pairs = fr.read().splitlines()
         self.img_paths, self.lb_paths = [], []
         for pair in pairs:
-            imgpth, lbpth = pair.split(',')
-            self.img_paths.append(osp.join(dataroot, imgpth))
-            self.lb_paths.append(osp.join(dataroot, lbpth))
+            img_pth, lb_pth = pair.split(',')
+            self.img_paths.append(osp.join(data_root, img_pth))
+            self.lb_paths.append(osp.join(data_root, lb_pth))
 
         assert len(self.img_paths) == len(self.lb_paths)
         self.len = len(self.img_paths)
 
     def __getitem__(self, idx):
-        impth, lbpth = self.img_paths[idx], self.lb_paths[idx]
-        assert cv2.imread(impth) is not None
-        assert cv2.imread(lbpth, 0) is not None
-        img, label = cv2.imread(impth)[:, :, ::-1], cv2.imread(lbpth, 0)
-        assert img.shape[:2] == label.shape[:2], f'image: {impth}, label: {lbpth}\n' \
-                                                 f'image shape: {img.shape}, label shape: {label.shape}'
-        if not self.lb_map is None:
-            label = self.lb_map[label]
-        im_lb = dict(im=img, lb=label)
+        im_pth, lb_pth = self.img_paths[idx], self.lb_paths[idx]
+        assert cv2.imread(im_pth) is not None, im_pth
+        assert cv2.imread(lb_pth, 0) is not None, lb_pth
+        img, label_ = cv2.imread(im_pth)[:, :, ::-1], cv2.imread(lb_pth, 0)
+        assert img.shape[:2] == label_.shape[:2], f'image: {im_pth}, label: {lb_pth}\n' \
+                                                  f'image shape: {img.shape}, label shape: {label_.shape}'
+        if self.lb_map is not None:
+            label_ = self.lb_map[label_]
+        im_lb = dict(im=img, lb=label_)
         if not self.trans_func is None:
             im_lb = self.trans_func(im_lb)
         im_lb = self.to_tensor(im_lb)
-        img, label = im_lb['im'], im_lb['lb']
-        return img.detach(), label.unsqueeze(0).detach()
+        img, label_ = im_lb['im'], im_lb['lb']
+        return img.detach(), label_.unsqueeze(0).detach()
 
     def __len__(self):
         return self.len
@@ -72,13 +66,26 @@ class TransformationTrain(object):
 
 class TransformationVal(object):
 
+    def __init__(self, scales, cropsize):
+        self.trans_func = T.Compose([
+            T.RandomResizedCrop(scales, cropsize),
+            T.RandomHorizontalFlip(),
+            T.ColorJitter(
+                brightness=0.4,
+                contrast=0.4,
+                saturation=0.4
+            ),
+        ])
+
     def __call__(self, im_lb):
+        im_lb = self.trans_func(im_lb)
         im, lb = im_lb['im'], im_lb['lb']
         return dict(im=im, lb=lb)
 
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
+    from src.models.bisenetv2.cityscapes_cv2 import CityScapes
 
     ds = CityScapes('./data/', mode='val')
     dl = DataLoader(ds,

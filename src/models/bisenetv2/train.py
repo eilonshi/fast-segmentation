@@ -61,7 +61,7 @@ args = parse_args()
 
 
 def set_model():
-    net = BiSeNetV2(19)
+    net = BiSeNetV2(NUM_CLASSES)
     if args.use_sync_bn: net = set_syncbn(net)
     net.cuda()
     net.train()

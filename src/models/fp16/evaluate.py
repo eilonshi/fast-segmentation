@@ -19,6 +19,7 @@ import numpy as np
 from tqdm import tqdm
 import math
 
+from src.tools.consts import NUM_CLASSES
 
 
 class MscEval(object):
@@ -26,7 +27,7 @@ class MscEval(object):
             model,
             dataloader,
             scales = [0.5, 0.75, 1, 1.25, 1.5, 1.75],
-            n_classes = 19,
+            n_classes = NUM_CLASSES,
             lb_ignore = 255,
             cropsize = 1024,
             flip = True,
@@ -151,7 +152,7 @@ def evaluate(respth='./res', dspth='./data'):
     logger.info('===='*20)
     logger.info('evaluating the model ...\n')
     logger.info('setup and restore model')
-    n_classes = 19
+    n_classes = NUM_CLASSES
     net = BiSeNet(n_classes=n_classes)
     save_pth = osp.join(respth, 'model_final.pth')
     net.load_state_dict(torch.load(save_pth))

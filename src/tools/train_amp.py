@@ -3,7 +3,6 @@
 
 import sys
 
-
 sys.path.insert(0, '')
 import os
 import os.path as osp
@@ -120,9 +119,8 @@ def train():
     is_dist = dist.is_initialized()
 
     # dataset
-    dl = get_data_loader(
-        cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.cropsize, cfg.max_iter, mode='train',
-        distributed=is_dist)
+    dl = get_data_loader(cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size, cfg.max_iter,
+                         mode='train', distributed=is_dist)
 
     # model
     net, criteria_pre, criteria_aux = set_model()
@@ -171,13 +169,14 @@ def train():
         if (it + 1) % 100 == 0:
             lr = lr_schdr.get_lr()
             lr = sum(lr) / len(lr)
-            print_log_msg(
-                it, cfg.max_iter, lr, time_meter, loss_meter,
-                loss_pre_meter, loss_aux_meters)
+            print_log_msg(it, cfg.max_iter, lr, time_meter, loss_meter, loss_pre_meter, loss_aux_meters)
         lr_schdr.step()
 
     # dump the final model and evaluate the result
-    save_pth = osp.join(cfg.respth, 'model_final.pth')
+    i = 0
+    while os.path.exists(f"model_final_{i}.pth"):
+        i += 1
+    save_pth = osp.join(cfg.respth, f"model_final_{i}.pth")
     logger.info('\nsave models to {}'.format(save_pth))
     state = net.module.state_dict()
     if dist.get_rank() == 0:

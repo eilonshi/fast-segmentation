@@ -27,7 +27,7 @@ cfg = cfg_factory[args.model]
 palette = np.random.randint(0, 256, (256, 3), dtype=np.uint8)
 
 # define model
-net = model_factory[cfg.model_type](19)
+net = model_factory[cfg.model_type](NUM_CLASSES)
 net.load_state_dict(torch.load(args.weight_path, map_location='cpu'))
 net.eval()
 net.cuda()

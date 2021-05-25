@@ -62,7 +62,7 @@ class CityScapes(Dataset):
         assert mode in ('train', 'val', 'test')
         self.mode = mode
         self.trans_func = trans_func
-        self.n_cats = 19
+        self.n_cats = NUM_CLASSES
         self.lb_ignore = 255
 
         self.lb_map = np.arange(256).astype(np.uint8)

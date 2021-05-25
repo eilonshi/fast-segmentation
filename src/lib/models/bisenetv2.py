@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.tools.consts import NUM_CLASSES
+
 
 class ConvBNReLU(nn.Module):
 
@@ -385,7 +387,7 @@ if __name__ == "__main__":
     #  print(feat.size())
     #
     #  x = torch.randn(16, 128, 64, 128)
-    #  head = SegmentHead(128, 128, 19)
+    #  head = SegmentHead(128, 128, NUM_CLASSES)
     #  logits = head(x)
     #  print(logits.size())
     #
@@ -395,7 +397,7 @@ if __name__ == "__main__":
     #  print(feat.size())
     #
     x = torch.randn(16, 3, 1024, 2048)
-    model = BiSeNetV2(n_classes=19)
+    model = BiSeNetV2(n_classes=NUM_CLASSES)
     outs = model(x)
     for out in outs:
         print(out.size())

@@ -1,5 +1,8 @@
 #!/usr/bin/python
 # -*- encoding: utf-8 -*-
+import sys
+
+sys.path.insert(0, '')
 
 import torch
 from torch.utils.data import Dataset, DataLoader
@@ -9,6 +12,7 @@ import numpy as np
 from src.lib import transform_cv2 as T
 from src.lib.sampler import RepeatedDistSampler
 from src.lib.base_dataset import BaseDataset, TransformationTrain, TransformationVal
+from src.tools.consts import NUM_CLASSES, NUM_WORKERS
 
 labels_info = [
     {"hasInstances": False, "category": "void", "catid": 0, "name": "unlabeled", "ignoreInEval": True, "id": 0,
@@ -84,14 +88,10 @@ labels_info = [
 ]
 
 
-class CityScapes(BaseDataset):
-    '''
-    '''
-
-    def __init__(self, dataroot, annpath, trans_func=None, mode='train'):
-        super(CityScapes, self).__init__(
-            dataroot, annpath, trans_func, mode)
-        self.n_cats = 19
+class Cityscapes(BaseDataset):
+    def __init__(self, data_root, ann_path, trans_func=None, mode='train'):
+        super(Cityscapes, self).__init__(data_root, ann_path, trans_func, mode)
+        self.n_cats = NUM_CLASSES
         self.lb_ignore = 255
         self.lb_map = np.arange(256).astype(np.uint8)
         for el in labels_info:
@@ -103,61 +103,46 @@ class CityScapes(BaseDataset):
         )
 
 
-def get_data_loader(datapth, annpath, ims_per_gpu, scales, cropsize, max_iter=None, mode='train', distributed=True):
+def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_iter=None, mode='train', distributed=True):
     if mode == 'train':
-        trans_func = TransformationTrain(scales, cropsize)
-        batchsize = ims_per_gpu
+        trans_func = TransformationTrain(scales, crop_size)
+        batch_size = ims_per_gpu
         shuffle = True
         drop_last = True
     elif mode == 'val':
-        trans_func = TransformationVal()
-        batchsize = ims_per_gpu
+        trans_func = TransformationVal(scales, crop_size)
+        batch_size = ims_per_gpu
         shuffle = False
         drop_last = False
+    else:
+        raise ValueError
 
-    ds = CityScapes(datapth, annpath, trans_func=trans_func, mode=mode)
+    ds_ = Cityscapes(data_path, ann_path, trans_func=trans_func, mode=mode)
 
     if distributed:
-        assert dist.is_available(), "dist should be initialzed"
+        assert dist.is_available(), "dist should be initialized"
         if mode == 'train':
-            assert not max_iter is None
-            n_train_imgs = ims_per_gpu * dist.get_world_size() * max_iter
-            sampler = RepeatedDistSampler(ds, n_train_imgs, shuffle=shuffle)
+            assert max_iter is not None
+            n_train_images = ims_per_gpu * dist.get_world_size() * max_iter
+            sampler = RepeatedDistSampler(ds_, n_train_images, shuffle=shuffle)
         else:
-            sampler = torch.utils.data.distributed.DistributedSampler(
-                ds, shuffle=shuffle)
-        batchsampler = torch.utils.data.sampler.BatchSampler(
-            sampler, batchsize, drop_last=drop_last
-        )
-        dl = DataLoader(
-            ds,
-            batch_sampler=batchsampler,
-            num_workers=4,
-            pin_memory=True,
-        )
+            # sampler = torch.utils.data.distributed.DistributedSampler(ds_, shuffle=shuffle)
+            sampler = RepeatedDistSampler(ds_, ims_per_gpu, shuffle=shuffle)
+        batch_sampler = torch.utils.data.sampler.BatchSampler(sampler, batch_size, drop_last=drop_last)
+        dl_ = DataLoader(ds_, batch_sampler=batch_sampler, num_workers=NUM_WORKERS, pin_memory=True)
     else:
-        dl = DataLoader(
-            ds,
-            batch_size=batchsize,
-            shuffle=shuffle,
-            drop_last=drop_last,
-            num_workers=4,
-            pin_memory=True,
-        )
-    return dl
+        dl_ = DataLoader(ds_, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=NUM_WORKERS,
+                         pin_memory=True)
+    return dl_
 
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
 
-    ds = CityScapes('./data/', mode='val')
-    dl = DataLoader(ds,
-                    batch_size=4,
-                    shuffle=True,
-                    num_workers=4,
-                    drop_last=True)
-    for imgs, label in dl:
-        print(len(imgs))
-        for el in imgs:
+    ds = Cityscapes(data_root='./data/', ann_path='./data/val.txt', mode='val')
+    dl = DataLoader(ds, batch_size=2, shuffle=True, num_workers=NUM_WORKERS, drop_last=True)
+    for images, label in dl:
+        print(len(images))
+        for el in images:
             print(el.size())
         break

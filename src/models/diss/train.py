@@ -53,7 +53,7 @@ def train():
     setup_logger(respth)
 
     ## dataset
-    n_classes = 19
+    n_classes = NUM_CLASSES
     n_img_per_gpu = 8
     n_workers = 4
     cropsize = [1024, 1024]

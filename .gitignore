@@ -116,3 +116,5 @@ src/tensorrt/build/*
 # images
 *.png
 *.jpg
+*.JPG
+*.jpeg

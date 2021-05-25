@@ -22,6 +22,7 @@ import time
 import datetime
 import argparse
 
+from src.tools.consts import NUM_CLASSES
 
 respth = './res'
 if not osp.exists(respth): os.makedirs(respth)
@@ -31,17 +32,17 @@ logger = logging.getLogger()
 def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument(
-            '--local_rank',
-            dest = 'local_rank',
-            type = int,
-            default = -1,
-            )
+        '--local_rank',
+        dest='local_rank',
+        type=int,
+        default=-1,
+    )
     parse.add_argument(
-            '--ckpt',
-            dest = 'ckpt',
-            type = str,
-            default = None,
-            )
+        '--ckpt',
+        dest='ckpt',
+        type=str,
+        default=None,
+    )
     return parse.parse_args()
 
 
@@ -49,15 +50,15 @@ def train():
     args = parse_args()
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(
-                backend = 'nccl',
-                init_method = 'tcp://127.0.0.1:33271',
-                world_size = torch.cuda.device_count(),
-                rank=args.local_rank
-                )
+        backend='nccl',
+        init_method='tcp://127.0.0.1:33271',
+        world_size=torch.cuda.device_count(),
+        rank=args.local_rank
+    )
     setup_logger(respth)
 
-    ## dataset
-    n_classes = 19
+    # dataset
+    n_classes = NUM_CLASSES
     n_img_per_gpu = 8
     n_workers = 4
     cropsize = [1024, 1024]
@@ -65,12 +66,12 @@ def train():
     ds = Cityscapes('./data', cropsize=cropsize, mode='train')
     sampler = torch.utils.data.distributed.DistributedSampler(ds)
     dl = DataLoader(ds,
-                    batch_size = n_img_per_gpu,
-                    shuffle = False,
-                    sampler = sampler,
-                    num_workers = n_workers,
-                    pin_memory = True,
-                    drop_last = True)
+                    batch_size=n_img_per_gpu,
+                    shuffle=False,
+                    sampler=sampler,
+                    num_workers=n_workers,
+                    pin_memory=True,
+                    drop_last=True)
 
     ## model
     ignore_idx = 255
@@ -80,11 +81,11 @@ def train():
     net.cuda()
     net.train()
     net = nn.parallel.DistributedDataParallel(net,
-            device_ids = [args.local_rank, ],
-            output_device = args.local_rank
-            )
+                                              device_ids=[args.local_rank, ],
+                                              output_device=args.local_rank
+                                              )
     score_thres = 0.7
-    n_min = n_img_per_gpu*cropsize[0]*cropsize[1]//16
+    n_min = n_img_per_gpu * cropsize[0] * cropsize[1] // 16
     criteria_p = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
     criteria_16 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
     criteria_32 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
@@ -98,14 +99,14 @@ def train():
     warmup_steps = 1000
     warmup_start_lr = 1e-5
     optim = Optimizer(
-            model = net.module,
-            lr0 = lr_start,
-            momentum = momentum,
-            wd = weight_decay,
-            warmup_steps = warmup_steps,
-            warmup_start_lr = warmup_start_lr,
-            max_iter = max_iter,
-            power = power)
+        model=net.module,
+        lr0=lr_start,
+        momentum=momentum,
+        wd=weight_decay,
+        warmup_steps=warmup_steps,
+        warmup_start_lr=warmup_start_lr,
+        max_iter=max_iter,
+        power=power)
 
     ## train loop
     msg_iter = 50
@@ -116,7 +117,7 @@ def train():
     for it in range(max_iter):
         try:
             im, lb = next(diter)
-            if not im.size()[0]==n_img_per_gpu: raise StopIteration
+            if not im.size()[0] == n_img_per_gpu: raise StopIteration
         except StopIteration:
             epoch += 1
             sampler.set_epoch(epoch)
@@ -138,7 +139,7 @@ def train():
 
         loss_avg.append(loss.item())
         ## print training log message
-        if (it+1)%msg_iter==0:
+        if (it + 1) % msg_iter == 0:
             loss_avg = sum(loss_avg) / len(loss_avg)
             lr = optim.lr
             ed = time.time()
@@ -146,28 +147,31 @@ def train():
             eta = int((max_iter - it) * (glob_t_intv / it))
             eta = str(datetime.timedelta(seconds=eta))
             msg = ', '.join([
-                    'it: {it}/{max_it}',
-                    'lr: {lr:4f}',
-                    'loss: {loss:.4f}',
-                    'eta: {eta}',
-                    'time: {time:.4f}',
-                ]).format(
-                    it = it+1,
-                    max_it = max_iter,
-                    lr = lr,
-                    loss = loss_avg,
-                    time = t_intv,
-                    eta = eta
-                )
+                'it: {it}/{max_it}',
+                'lr: {lr:4f}',
+                'loss: {loss:.4f}',
+                'eta: {eta}',
+                'time: {time:.4f}',
+            ]).format(
+                it=it + 1,
+                max_it=max_iter,
+                lr=lr,
+                loss=loss_avg,
+                time=t_intv,
+                eta=eta
+            )
             logger.info(msg)
             loss_avg = []
             st = ed
 
-    ## dump the final model
-    save_pth = osp.join(respth, 'model_final.pth')
+    # dump the final model
+    i = 0
+    while os.path.exists(f"model_final_{i}.pth"):
+        i += 1
+    save_pth = osp.join(respth, f'model_final_{i}.pth')
     net.cpu()
     state = net.module.state_dict() if hasattr(net, 'module') else net.state_dict()
-    if dist.get_rank()==0: torch.save(state, save_pth)
+    if dist.get_rank() == 0: torch.save(state, save_pth)
     logger.info('training done, model saved to: {}'.format(save_pth))
 
 

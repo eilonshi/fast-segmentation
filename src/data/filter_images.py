@@ -9,8 +9,21 @@ from consts import OTHER_LABEL, BUILDING_LABEL, MAPPING_DICT_ADE, IRRELEVANT_LAB
     IRRELEVANT_LABELS_CITYSCAPES, MAPPING_DICT_BARAK, IRRELEVANT_LABELS_BARAK, TRAIN_PERCENT, VAL_PERCENT, TEST_PERCENT
 
 
+def delete_files_in_folder(folder):
+    for filename in os.listdir(folder):
+        file_path = os.path.join(folder, filename)
+        try:
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            print('Failed to delete %s. Reason: %s' % (file_path, e))
+
+
 def filter_data_folder(mapping_dict_, irrelevant_labels_, old_ann_folder_, new_ann_folder_, old_img_folder_,
                        new_img_folder_):
+    delete_files_in_folder(new_img_folder_)
+    delete_files_in_folder(new_ann_folder_)
+
     image_counter = 0
     relevant_images_counter = 0
 

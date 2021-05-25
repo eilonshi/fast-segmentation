@@ -67,7 +67,7 @@ def eval_model(net, ims_per_gpu):
 
     with torch.no_grad():
         single_scale = MscEvalV0()
-        mIOU = single_scale(net, dl, 19)
+        mIOU = single_scale(net, dl, NUM_CLASSES)
     logger = logging.getLogger()
     logger.info('mIOU is: %s\n', mIOU)
 
@@ -77,7 +77,7 @@ def evaluate(weight_pth):
 
     ## model
     logger.info('setup and restore model')
-    net = BiSeNetV2(19)
+    net = BiSeNetV2(NUM_CLASSES)
     net.load_state_dict(torch.load(weight_pth))
     net.cuda()
 

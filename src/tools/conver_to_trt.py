@@ -23,7 +23,7 @@ args = parse.parse_args()
 cfg = cfg_factory[args.config]
 if cfg.use_sync_bn: cfg.use_sync_bn = False
 
-net = model_factory[cfg.model_type](19, output_aux=False).cuda()
+net = model_factory[cfg.model_type](NUM_CLASSES, output_aux=False).cuda()
 #  net.load_state_dict(torch.load(args.weight_pth))
 net.eval()
 

@@ -3,6 +3,8 @@
 
 import sys
 
+from src.tools.consts import NUM_CLASSES
+
 sys.path.insert(0, '')
 import os
 import os.path as osp
@@ -59,7 +61,7 @@ cfg = cfg_factory[args.model]
 
 def set_model():
 
-    net = model_factory[cfg.model_type](19)
+    net = model_factory[cfg.model_type](NUM_CLASSES)
     if args.finetune_from is not None:
         net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
     if cfg.use_sync_bn:
@@ -136,7 +138,7 @@ def train():
     # dataset
     dl = get_data_loader(
         cfg.im_root, cfg.train_im_anns,
-        cfg.ims_per_gpu, cfg.scales, cfg.cropsize,
+        cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
         cfg.max_iter, mode='train', distributed=is_dist)
 
     # model

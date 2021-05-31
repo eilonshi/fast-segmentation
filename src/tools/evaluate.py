@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.distributed as dist
 
-from src.tools.consts import NUM_CLASSES
+from src.tools.consts import NUM_CLASSES, IGNORE_LABEL
 from src.configs import cfg_factory
 from src.lib.models import model_factory
 from src.lib.logger import setup_logger
@@ -42,7 +42,7 @@ cfg = cfg_factory[args.model]
 
 class MscEvalV0(object):
 
-    def __init__(self, scales=(0.5,), flip=False, ignore_label=255):
+    def __init__(self, scales=(0.5,), flip=False, ignore_label=IGNORE_LABEL):
         self.scales = scales
         self.flip = flip
         self.ignore_label = ignore_label
@@ -55,10 +55,10 @@ class MscEvalV0(object):
         else:
             d_iter = enumerate(tqdm(dl))
 
-        for i, (imgs, label) in d_iter:
-            n, _, h, w = label.shape
-            label = label.squeeze(1).cuda()
-            size = label.size()[-2:]
+        for i, (imgs, labels) in d_iter:
+            n, _, h, w = labels.shape
+            labels = labels.squeeze(1).cuda()
+            size = labels.size()[-2:]
             probs = torch.zeros((n, n_classes, h, w), dtype=torch.float32).cuda().detach()
 
             for scale in self.scales:
@@ -66,25 +66,31 @@ class MscEvalV0(object):
                 im_sc = F.interpolate(imgs, size=(s_h, s_w), mode='bilinear', align_corners=True)
 
                 im_sc = im_sc.cuda()
-                logits = net(im_sc)[0]
-                logits = F.interpolate(logits, size=size, mode='bilinear', align_corners=True)
-                probs += torch.softmax(logits, dim=1)
                 if self.flip:
                     im_sc = torch.flip(im_sc, dims=(3,))
-                    logits = net(im_sc)[0]
+
+                logits = net(im_sc)[0]
+
+                if self.flip:
                     logits = torch.flip(logits, dims=(3,))
-                    logits = F.interpolate(logits, size=size, mode='bilinear', align_corners=True)
-                    probs += torch.softmax(logits, dim=1)
+
+                logits = F.interpolate(logits, size=size, mode='bilinear', align_corners=True)
+                probs += torch.softmax(logits, dim=1)
+
+            # calc histogram of the predictions in each class
             preds = torch.argmax(probs, dim=1)
-            keep = label != self.ignore_label
-            hist += torch.bincount(
-                label[keep] * n_classes + preds[keep],
-                minlength=n_classes ** 2
-            ).view(n_classes, n_classes)
+            relevant_labels = labels != self.ignore_label
+            hist += torch.bincount(labels[relevant_labels] * n_classes + preds[relevant_labels],
+                                   minlength=n_classes ** 2).view(n_classes, n_classes)
+
         if dist.is_initialized():
             dist.all_reduce(hist, dist.ReduceOp.SUM)
-        ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
+
+        # diagonal is the intersection and the
+        ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag() + 1e-6)
+        ious[ious != ious] = 0  # replace nan with zero
         miou = ious.mean()
+
         return miou.item()
 
 
@@ -107,15 +113,15 @@ class MscEvalCrop(object):
         self.crop_stride = crop_stride
 
     def pad_tensor(self, inten):
-        N, C, H, W = inten.size()
-        cropH, cropW = self.crop_size
-        if cropH < H and cropW < W: return inten, [0, H, 0, W]
-        padH, padW = max(cropH, H), max(cropW, W)
-        outten = torch.zeros(N, C, padH, padW).cuda()
+        n, c, h, w = inten.size()
+        crop_h, crop_w = self.crop_size
+        if crop_h < h and crop_w < w: return inten, [0, h, 0, w]
+        pad_h, pad_w = max(crop_h, h), max(crop_w, w)
+        outten = torch.zeros(n, c, pad_h, pad_w).cuda()
         outten.requires_grad_(False)
-        marginH, marginW = padH - H, padW - W
-        hst, hed = marginH // 2, marginH // 2 + H
-        wst, wed = marginW // 2, marginW // 2 + W
+        margin_h, margin_w = pad_h - h, pad_w - w
+        hst, hed = margin_h // 2, margin_h // 2 + h
+        wst, wed = margin_w // 2, margin_w // 2 + w
         outten[:, :, hst:hed, wst:wed] = inten
         return outten, [hst, hed, wst, wed]
 
@@ -141,21 +147,21 @@ class MscEvalCrop(object):
         prob.requires_grad_(False)
         for i in range(n_h):
             for j in range(n_w):
-                stH, stW = stride_h * i, stride_w * j
-                endH, endW = min(h, stH + crop_h), min(w, stW + crop_w)
-                stH, stW = endH - crop_h, endW - crop_w
-                chip = im[:, :, stH:endH, stW:endW]
-                prob[:, :, stH:endH, stW:endW] += self.eval_chip(net, chip)
+                st_h, st_w = stride_h * i, stride_w * j
+                end_h, end_w = min(h, st_h + crop_h), min(w, st_w + crop_w)
+                st_h, st_w = end_h - crop_h, end_w - crop_w
+                chip = im[:, :, st_h:end_h, st_w:end_w]
+                prob[:, :, st_h:end_h, st_w:end_w] += self.eval_chip(net, chip)
         hst, hed, wst, wed = indices
         prob = prob[:, :, hst:hed, wst:wed]
         return prob
 
     def scale_crop_eval(self, net, im, scale, n_classes):
-        N, C, H, W = im.size()
-        new_hw = [int(H * scale), int(W * scale)]
+        n, c, h, w = im.size()
+        new_hw = [int(h * scale), int(w * scale)]
         im = F.interpolate(im, new_hw, mode='bilinear', align_corners=True)
         prob = self.crop_eval(net, im, n_classes)
-        prob = F.interpolate(prob, (H, W), mode='bilinear', align_corners=True)
+        prob = F.interpolate(prob, (h, w), mode='bilinear', align_corners=True)
         return prob
 
     @torch.no_grad()
@@ -164,6 +170,7 @@ class MscEvalCrop(object):
 
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
         hist.requires_grad_(False)
+
         for i, (imgs, label) in enumerate(dloader):
             imgs = imgs.cuda()
             label = label.squeeze(1).cuda()
@@ -183,7 +190,9 @@ class MscEvalCrop(object):
 
         if self.distributed:
             dist.all_reduce(hist, dist.ReduceOp.SUM)
+
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
+        ious[ious != ious] = 0  # replace nan with zero
         miou = ious.mean()
         return miou.item()
 
@@ -208,7 +217,7 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
         crop_stride=2. / 3,
         flip=False,
         scales=[1.],
-        lb_ignore=255,
+        lb_ignore=IGNORE_LABEL,
     )
     miou = single_crop(net, dl, NUM_CLASSES)
     heads.append('single_scale_crop')
@@ -226,7 +235,7 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
         crop_stride=2. / 3,
         flip=True,
         scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
-        lb_ignore=255,
+        lb_ignore=IGNORE_LABEL,
     )
     miou = ms_flip_crop(net, dl, NUM_CLASSES)
     heads.append('ms_flip_crop')
@@ -241,7 +250,6 @@ def evaluate(cfg_, weight_pth):
     # model
     logger.info('setup and restore model')
     net = model_factory[cfg_.model_type](NUM_CLASSES)
-    #  net = BiSeNetV2(NUM_CLASSES)
     net.load_state_dict(torch.load(weight_pth))
     net.cuda()
 
@@ -255,7 +263,7 @@ def evaluate(cfg_, weight_pth):
         )
 
     # evaluator
-    heads, mious = eval_model(net, 2, cfg_.im_root, cfg_.val_im_anns)
+    heads, mious = eval_model(net, cfg_.ims_per_gpu, cfg_.im_root, cfg_.val_im_anns)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
 

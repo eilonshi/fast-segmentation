@@ -70,7 +70,10 @@ def filter_data_folder(mapping_dict_, irrelevant_labels_, old_ann_folder_, new_a
                 img_old_path = img_old_path.replace('_w', '')
 
             img_new_path = os.path.join(new_img_folder_, filename)
-            shutil.copy(img_old_path, img_new_path)
+            # shutil.copy(img_old_path, img_new_path)
+            img = cv2.imread(img_old_path)
+            img = cv2.normalize(img, img, 0, 255, cv2.NORM_MINMAX)
+            cv2.imwrite(img_new_path, img)
 
     print(f'There are {image_counter} images in the {old_img_folder_} data-set, {relevant_images_counter} of them are '
           f'relevant')

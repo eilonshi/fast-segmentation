@@ -22,7 +22,7 @@ from src.lib.models import model_factory
 from src.configs import cfg_factory
 from src.lib.cityscapes_cv2 import get_data_loader
 from src.tools.evaluate import eval_model
-from src.lib.ohem_ce_loss import OhemCELoss
+from src.lib.ohem_ce_loss import OHEMCrossEntropyLoss
 from src.lib.lr_scheduler import WarmupPolyLrScheduler
 from src.lib.meters import TimeMeter, AvgMeter
 from src.lib.logger import setup_logger, print_log_msg
@@ -68,8 +68,8 @@ def set_model():
         net = set_syncbn(net)
     net.cuda()
     net.train()
-    criteria_pre = OhemCELoss(0.7)
-    criteria_aux = [OhemCELoss(0.7) for _ in range(cfg.num_aux_heads)]
+    criteria_pre = OHEMCrossEntropyLoss(0.7)
+    criteria_aux = [OHEMCrossEntropyLoss(0.7) for _ in range(cfg.num_aux_heads)]
     return net, criteria_pre, criteria_aux
 
 

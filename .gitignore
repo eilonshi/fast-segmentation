@@ -113,8 +113,9 @@ src/tensorrt/build/*
 # weights
 *.pth
 
-# images
+# images and labels
 *.png
 *.jpg
 *.JPG
 *.jpeg
+*.json

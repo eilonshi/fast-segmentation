@@ -48,9 +48,9 @@ class BaseDataset(Dataset):
 
 class TransformationTrain(object):
 
-    def __init__(self, scales, cropsize):
+    def __init__(self, scales, crop_size):
         self.trans_func = T.Compose([
-            T.RandomResizedCrop(scales, cropsize),
+            T.RandomResizedCrop(scales, crop_size),
             T.RandomHorizontalFlip(),
             T.ColorJitter(
                 brightness=0.4,
@@ -61,14 +61,15 @@ class TransformationTrain(object):
 
     def __call__(self, im_lb):
         im_lb = self.trans_func(im_lb)
+
         return im_lb
 
 
 class TransformationVal(object):
 
-    def __init__(self, scales, cropsize):
+    def __init__(self, scales, crop_size):
         self.trans_func = T.Compose([
-            T.RandomResizedCrop(scales, cropsize),
+            T.RandomResizedCrop(scales, crop_size),
             T.RandomHorizontalFlip(),
             T.ColorJitter(
                 brightness=0.4,

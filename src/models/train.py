@@ -1,180 +1,215 @@
-#!/usr/bin/python
-# -*- encoding: utf-8 -*-
-
-
-from logger import setup_logger
-from model import BiSeNet
-from cityscapes import Cityscapes
-from loss import OhemCELoss
-from evaluate import evaluate
-from optimizer import Optimizer
+import os
+import os.path as osp
+import random
+import logging
+import argparse
+import numpy as np
+from tabulate import tabulate
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
 import torch.distributed as dist
+import torch.cuda.amp as amp
+from torch.utils.tensorboard import SummaryWriter
+from torch.backends import cudnn
 
-import os
-import os.path as osp
-import logging
-import time
-import datetime
-import argparse
+from evaluate import eval_model
+from src.configs import cfg_factory
+from src.models.consts import NUM_CLASSES
+from src.lib.architectures import model_factory
+from src.lib.cityscapes_cv2 import get_data_loader
+from src.lib.ohem_ce_loss import OHEMCrossEntropyLoss
+from src.lib.lr_scheduler import WarmupPolyLrScheduler
+from src.lib.meters import TimeMeter, AvgMeter
+from src.lib.logger import setup_logger, print_log_msg
 
-from src.tools.consts import NUM_CLASSES
-
-respth = './res'
-if not osp.exists(respth): os.makedirs(respth)
-logger = logging.getLogger()
+# fix all random seeds
+torch.manual_seed(123)
+torch.cuda.manual_seed(123)
+np.random.seed(123)
+random.seed(123)
+torch.backends.cudnn.deterministic = True
 
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument(
-        '--local_rank',
-        dest='local_rank',
-        type=int,
-        default=-1,
-    )
-    parse.add_argument(
-        '--ckpt',
-        dest='ckpt',
-        type=str,
-        default=None,
-    )
+    parse.add_argument('--local_rank', dest='local_rank', type=int, default=0)
+    parse.add_argument('--port', dest='port', type=int, default=44554)
+    parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
+    parse.add_argument('--finetune-from', type=str, default=None)
+    parse.add_argument('--amp', type=bool, default=True)
     return parse.parse_args()
 
 
+args = parse_args()
+cfg = cfg_factory[args.model]
+
+
+def set_model():
+    net = model_factory[cfg.model_type](NUM_CLASSES)
+
+    if args.finetune_from is not None:
+        net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
+    if cfg.use_sync_bn:
+        net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
+
+    net.cuda()
+    net.train()
+    criteria_pre = OHEMCrossEntropyLoss(0.7)
+    criteria_aux = [OHEMCrossEntropyLoss(0.7) for _ in range(cfg.num_aux_heads)]
+
+    return net, criteria_pre, criteria_aux
+
+
+def set_optimizer(model):
+    if hasattr(model, 'get_params'):
+        wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params = model.get_params()
+        params_list = [
+            {'params': wd_params, },
+            {'params': nowd_params, 'weight_decay': 0},
+            {'params': lr_mul_wd_params, 'lr': cfg.lr_start * 10},
+            {'params': lr_mul_nowd_params, 'weight_decay': 0, 'lr': cfg.lr_start * 10},
+        ]
+    else:
+        wd_params, non_wd_params = [], []
+        for name, param in model.named_parameters():
+            if param.dim() == 1:
+                non_wd_params.append(param)
+            elif param.dim() == 2 or param.dim() == 4:
+                wd_params.append(param)
+        params_list = [
+            {'params': wd_params, },
+            {'params': non_wd_params, 'weight_decay': 0},
+        ]
+    optimizer = torch.optim.SGD(
+        params_list,
+        lr=cfg.lr_start,
+        momentum=cfg.momentum,
+        weight_decay=cfg.weight_decay,
+    )
+    return optimizer
+
+
+def set_model_dist(net):
+    local_rank = dist.get_rank()
+    net = nn.parallel.DistributedDataParallel(
+        net,
+        device_ids=[local_rank, ],
+        # find_unused_parameters=True,
+        output_device=local_rank)
+    return net
+
+
+def set_meters():
+    time_meter = TimeMeter(cfg.max_iter)
+    loss_meter = AvgMeter('loss')
+    loss_pre_meter = AvgMeter('loss_prem')
+    loss_aux_meters = [AvgMeter('loss_aux{}'.format(i))
+                       for i in range(cfg.num_aux_heads)]
+    return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
+
+
 def train():
-    args = parse_args()
+    logger = logging.getLogger()
+    writer = SummaryWriter(log_dir='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
+    is_dist = dist.is_initialized()
+
+    # dataset
+    data_loader = get_data_loader(cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
+                                  cfg.max_iter, mode='train', distributed=is_dist)
+
+    # model
+    net, criteria_pre, criteria_aux = set_model()
+
+    # optimizer
+    optim = set_optimizer(net)
+
+    # mixed precision training
+    scaler = amp.GradScaler()
+
+    # ddp training
+    net = set_model_dist(net)
+
+    # meters
+    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()
+
+    # lr scheduler
+    lr_scheduler = WarmupPolyLrScheduler(optim, power=0.9, max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
+                                         warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
+
+    # train loop
+    for iteration, (image, label) in enumerate(data_loader):
+        image = image.cuda()
+        label = label.cuda()
+
+        label = torch.squeeze(label, 1)
+
+        optim.zero_grad()
+        with amp.autocast(enabled=cfg.use_fp16):
+            # get main loss and auxiliary losses
+            logits, *logits_aux = net(image)
+            loss_pre = criteria_pre(logits, label)
+            loss_aux = [criteria(logits, label) for criteria, logits in zip(criteria_aux, logits_aux)]
+
+            loss = loss_pre + sum(loss_aux)
+            writer.add_scalar("Loss/train", loss, iteration)
+
+        scaler.scale(loss).backward()
+        scaler.step(optim)
+        scaler.update()
+        torch.cuda.synchronize()
+
+        time_meter.update()
+        loss_meter.update(loss.item())
+        loss_pre_meter.update(loss_pre.item())
+        _ = [mter.update(lss.item()) for mter, lss in zip(loss_aux_meters, loss_aux)]
+
+        # print training log message
+        if (iteration + 1) % cfg.message_iters == 0:
+            lr = lr_scheduler.get_lr()
+            lr = sum(lr) / len(lr)
+            print_log_msg(iteration, cfg.max_iter, lr, time_meter, loss_meter, loss_pre_meter, loss_aux_meters)
+
+        # saving the model and evaluating it
+        if (iteration + 1) % cfg.checkpoint_iters == 0:
+            # save the model
+            i = 0
+            while os.path.exists(os.path.join(cfg.respth, f"model_final_{i}.pth")):
+                i += 1
+            log_pth = os.path.join(cfg.logpth, f"model_final_{i}.pth")
+            save_pth = os.path.join(cfg.respth, f"model_final_{i}.pth")
+            logger.info('\nsave models to {}'.format(log_pth))
+            state = net.module.state_dict()
+            if dist.get_rank() == 0:
+                torch.save(state, save_pth)
+
+            # evaluate the results
+            logger.info('\nevaluating the model')
+            torch.cuda.empty_cache()
+            heads, mious = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
+                                      im_anns=cfg.val_im_anns)
+            logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
+
+        lr_scheduler.step()
+
+    writer.flush()
+    writer.close()
+
+
+def main():
+    torch.cuda.empty_cache()
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(
         backend='nccl',
-        init_method='tcp://127.0.0.1:33271',
+        init_method='tcp://127.0.0.1:{}'.format(args.port),
         world_size=torch.cuda.device_count(),
         rank=args.local_rank
     )
-    setup_logger(respth)
-
-    # dataset
-    n_classes = NUM_CLASSES
-    n_img_per_gpu = 8
-    n_workers = 4
-    cropsize = [1024, 1024]
-    #  cropsize = [1024, 512]
-    ds = Cityscapes('./data', cropsize=cropsize, mode='train')
-    sampler = torch.utils.data.distributed.DistributedSampler(ds)
-    dl = DataLoader(ds,
-                    batch_size=n_img_per_gpu,
-                    shuffle=False,
-                    sampler=sampler,
-                    num_workers=n_workers,
-                    pin_memory=True,
-                    drop_last=True)
-
-    ## model
-    ignore_idx = 255
-    net = BiSeNet(n_classes=n_classes)
-    if not args.ckpt is None:
-        net.load_state_dict(torch.load(args.ckpt, map_location='cpu'))
-    net.cuda()
-    net.train()
-    net = nn.parallel.DistributedDataParallel(net,
-                                              device_ids=[args.local_rank, ],
-                                              output_device=args.local_rank
-                                              )
-    score_thres = 0.7
-    n_min = n_img_per_gpu * cropsize[0] * cropsize[1] // 16
-    criteria_p = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-    criteria_16 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-    criteria_32 = OhemCELoss(thresh=score_thres, n_min=n_min, ignore_lb=ignore_idx)
-
-    ## optimizer
-    momentum = 0.9
-    weight_decay = 5e-4
-    lr_start = 1e-2
-    max_iter = 80000
-    power = 0.9
-    warmup_steps = 1000
-    warmup_start_lr = 1e-5
-    optim = Optimizer(
-        model=net.module,
-        lr0=lr_start,
-        momentum=momentum,
-        wd=weight_decay,
-        warmup_steps=warmup_steps,
-        warmup_start_lr=warmup_start_lr,
-        max_iter=max_iter,
-        power=power)
-
-    ## train loop
-    msg_iter = 50
-    loss_avg = []
-    st = glob_st = time.time()
-    diter = iter(dl)
-    epoch = 0
-    for it in range(max_iter):
-        try:
-            im, lb = next(diter)
-            if not im.size()[0] == n_img_per_gpu: raise StopIteration
-        except StopIteration:
-            epoch += 1
-            sampler.set_epoch(epoch)
-            diter = iter(dl)
-            im, lb = next(diter)
-        im = im.cuda()
-        lb = lb.cuda()
-        H, W = im.size()[2:]
-        lb = torch.squeeze(lb, 1)
-
-        optim.zero_grad()
-        out, out16, out32 = net(im)
-        lossp = criteria_p(out, lb)
-        loss2 = criteria_16(out16, lb)
-        loss3 = criteria_32(out32, lb)
-        loss = lossp + loss2 + loss3
-        loss.backward()
-        optim.step()
-
-        loss_avg.append(loss.item())
-        ## print training log message
-        if (it + 1) % msg_iter == 0:
-            loss_avg = sum(loss_avg) / len(loss_avg)
-            lr = optim.lr
-            ed = time.time()
-            t_intv, glob_t_intv = ed - st, ed - glob_st
-            eta = int((max_iter - it) * (glob_t_intv / it))
-            eta = str(datetime.timedelta(seconds=eta))
-            msg = ', '.join([
-                'it: {it}/{max_it}',
-                'lr: {lr:4f}',
-                'loss: {loss:.4f}',
-                'eta: {eta}',
-                'time: {time:.4f}',
-            ]).format(
-                it=it + 1,
-                max_it=max_iter,
-                lr=lr,
-                loss=loss_avg,
-                time=t_intv,
-                eta=eta
-            )
-            logger.info(msg)
-            loss_avg = []
-            st = ed
-
-    # dump the final model
-    i = 0
-    while os.path.exists(f"model_final_{i}.pth"):
-        i += 1
-    save_pth = osp.join(respth, f'model_final_{i}.pth')
-    net.cpu()
-    state = net.module.state_dict() if hasattr(net, 'module') else net.state_dict()
-    if dist.get_rank() == 0: torch.save(state, save_pth)
-    logger.info('training done, model saved to: {}'.format(save_pth))
+    if not osp.exists(cfg.respth):
+        os.makedirs(cfg.respth)
+    setup_logger('{}-train'.format(cfg.model_type), cfg.respth)
+    train()
 
 
 if __name__ == "__main__":
-    train()
-    evaluate()
+    main()

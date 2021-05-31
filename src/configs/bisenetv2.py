@@ -8,7 +8,7 @@ cfg = dict(
     warmup_iters=500,
     max_iter=20000,
     checkpoint_iters=1000,
-    message_iters=100,
+    message_iters=50,
     im_root='/home/bina/PycharmProjects/tevel-segmentation/data',
     train_im_anns='/home/bina/PycharmProjects/tevel-segmentation/data/train_small.txt',
     # '/home/bina/PycharmProjects/tevel-segmentation/data/train.txt',

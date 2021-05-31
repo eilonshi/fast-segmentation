@@ -2,6 +2,8 @@
 # -*- encoding: utf-8 -*-
 import sys
 
+from src.models.consts import NUM_CLASSES, NUM_WORKERS
+
 sys.path.insert(0, '')
 
 import torch
@@ -12,7 +14,6 @@ import numpy as np
 from src.lib import transform_cv2 as T
 from src.lib.sampler import RepeatedDistSampler
 from src.lib.base_dataset import BaseDataset, TransformationTrain, TransformationVal
-from src.tools.consts import NUM_CLASSES, NUM_WORKERS
 
 labels_info = [
     {"hasInstances": False, "category": "void", "catid": 0, "name": "unlabeled", "ignoreInEval": True, "id": 0,

@@ -36,7 +36,7 @@ class BaseDataset(Dataset):
         if self.lb_map is not None:
             label_ = self.lb_map[label_]
         im_lb = dict(im=img, lb=label_)
-        if not self.trans_func is None:
+        if self.trans_func is not None:
             im_lb = self.trans_func(im_lb)
         im_lb = self.to_tensor(im_lb)
         img, label_ = im_lb['im'], im_lb['lb']
@@ -86,9 +86,9 @@ class TransformationVal(object):
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
-    from src.models.bisenetv2.cityscapes_cv2 import CityScapes
+    from src.lib.cityscapes_cv2 import Cityscapes
 
-    ds = CityScapes('./data/', mode='val')
+    ds = Cityscapes(data_root='data/', ann_path='data/val.txt', mode='val')
     dl = DataLoader(ds,
                     batch_size=4,
                     shuffle=True,

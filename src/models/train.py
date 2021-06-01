@@ -38,6 +38,7 @@ def parse_args():
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--finetune-from', type=str, default=None)
     parse.add_argument('--amp', type=bool, default=True)
+
     return parse.parse_args()
 
 
@@ -81,10 +82,10 @@ def set_optimizer(model):
             {'params': wd_params, },
             {'params': non_wd_params, 'weight_decay': 0},
         ]
-    optimizer = torch.optim.SGD(
+    optimizer = torch.optim.Adam(
         params_list,
         lr=cfg.lr_start,
-        momentum=cfg.momentum,
+        betas=cfg.optimizer_betas,
         weight_decay=cfg.weight_decay,
     )
     return optimizer
@@ -114,27 +115,15 @@ def train():
     writer = SummaryWriter(log_dir='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
     is_dist = dist.is_initialized()
 
-    # dataset
+    # set all components
     data_loader = get_data_loader(cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
                                   cfg.max_iter, mode='train', distributed=is_dist)
-
-    # model
     net, criteria_pre, criteria_aux = set_model()
-
-    # optimizer
-    optim = set_optimizer(net)
-
-    # mixed precision training
-    scaler = amp.GradScaler()
-
-    # ddp training
-    net = set_model_dist(net)
-
-    # meters
-    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()
-
-    # lr scheduler
-    lr_scheduler = WarmupPolyLrScheduler(optim, power=0.9, max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
+    optimizer = set_optimizer(net)
+    scaler = amp.GradScaler()    # mixed precision training
+    net = set_model_dist(net)  # distributed training
+    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()    # metrics
+    lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
                                          warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
 
     # train loop
@@ -144,7 +133,7 @@ def train():
 
         label = torch.squeeze(label, 1)
 
-        optim.zero_grad()
+        optimizer.zero_grad()
         with amp.autocast(enabled=cfg.use_fp16):
             # get main loss and auxiliary losses
             logits, *logits_aux = net(image)
@@ -155,7 +144,7 @@ def train():
             writer.add_scalar("Loss/train", loss, iteration)
 
         scaler.scale(loss).backward()
-        scaler.step(optim)
+        scaler.step(optimizer)
         scaler.update()
         torch.cuda.synchronize()
 
@@ -188,6 +177,8 @@ def train():
             torch.cuda.empty_cache()
             heads, mious = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
                                       im_anns=cfg.val_im_anns)
+            # TODO: add mious to tensorboard log
+            # writer.add_scalar("Loss/train", loss, iteration)
             logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
         lr_scheduler.step()

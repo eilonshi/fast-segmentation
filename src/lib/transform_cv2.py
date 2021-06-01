@@ -1,19 +1,13 @@
-#!/usr/bin/python
-# -*- encoding: utf-8 -*-
-
-
-import random
 import math
-
 import numpy as np
 import cv2
 import torch
 
 
 class RandomResizedCrop(object):
-    '''
+    """
     size should be a tuple of (H, W)
-    '''
+    """
 
     def __init__(self, scales=(0.5, 1.), size=(384, 384)):
         self.scales = scales
@@ -71,45 +65,48 @@ class RandomHorizontalFlip(object):
 class ColorJitter(object):
 
     def __init__(self, brightness=None, contrast=None, saturation=None):
-        if not brightness is None and brightness >= 0:
+        if brightness is not None and brightness >= 0:
             self.brightness = [max(1 - brightness, 0), 1 + brightness]
-        if not contrast is None and contrast >= 0:
+        if contrast is not None and contrast >= 0:
             self.contrast = [max(1 - contrast, 0), 1 + contrast]
-        if not saturation is None and saturation >= 0:
+        if saturation is not None and saturation >= 0:
             self.saturation = [max(1 - saturation, 0), 1 + saturation]
 
     def __call__(self, im_lb):
         im, lb = im_lb['im'], im_lb['lb']
         assert im.shape[:2] == lb.shape[:2]
-        if not self.brightness is None:
+        if self.brightness is not None:
             rate = np.random.uniform(*self.brightness)
             im = self.adj_brightness(im, rate)
-        if not self.contrast is None:
+        if self.contrast is not None:
             rate = np.random.uniform(*self.contrast)
             im = self.adj_contrast(im, rate)
-        if not self.saturation is None:
+        if self.saturation is not None:
             rate = np.random.uniform(*self.saturation)
             im = self.adj_saturation(im, rate)
         return dict(im=im, lb=lb, )
 
-    def adj_saturation(self, im, rate):
-        M = np.float32([
+    @staticmethod
+    def adj_saturation(im, rate):
+        m = np.float32([
             [1 + 2 * rate, 1 - rate, 1 - rate],
             [1 - rate, 1 + 2 * rate, 1 - rate],
             [1 - rate, 1 - rate, 1 + 2 * rate]
         ])
         shape = im.shape
-        im = np.matmul(im.reshape(-1, 3), M).reshape(shape) / 3
+        im = np.matmul(im.reshape(-1, 3), m).reshape(shape) / 3
         im = np.clip(im, 0, 255).astype(np.uint8)
         return im
 
-    def adj_brightness(self, im, rate):
+    @staticmethod
+    def adj_brightness(im, rate):
         table = np.array([
             i * rate for i in range(256)
         ]).clip(0, 255).astype(np.uint8)
         return table[im]
 
-    def adj_contrast(self, im, rate):
+    @staticmethod
+    def adj_contrast(im, rate):
         table = np.array([
             74 + (i - 74) * rate for i in range(256)
         ]).clip(0, 255).astype(np.uint8)
@@ -117,9 +114,9 @@ class ColorJitter(object):
 
 
 class ToTensor(object):
-    '''
+    """
     mean and std should be of the channel order 'bgr'
-    '''
+    """
 
     def __init__(self, mean=(0, 0, 0), std=(1., 1., 1.)):
         self.mean = mean
@@ -133,7 +130,7 @@ class ToTensor(object):
         mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
         std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
         im = im.sub_(mean).div_(std).clone()
-        if not lb is None:
+        if lb is not None:
             lb = torch.from_numpy(lb.astype(np.int64).copy()).clone()
         return dict(im=im, lb=lb)
 

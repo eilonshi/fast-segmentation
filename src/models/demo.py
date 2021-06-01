@@ -1,6 +1,6 @@
-import math
-
 import argparse
+import os
+
 import torch
 import numpy as np
 import cv2
@@ -9,6 +9,7 @@ import time
 from src.lib import transform_cv2 as T
 from src.lib.architectures import model_factory
 from src.configs import cfg_factory
+from src.lib.cityscapes_cv2 import get_data_loader
 from src.models.consts import NUM_CLASSES
 
 torch.set_grad_enabled(False)
@@ -18,7 +19,7 @@ np.random.seed(123)
 parse = argparse.ArgumentParser()
 parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
 parse.add_argument('--weight-path', type=str,
-                   default='/home/bina/PycharmProjects/tevel-segmentation/models/model_final_171.pth')
+                   default='/home/bina/PycharmProjects/tevel-segmentation/models/model_final_211.pth')
 parse.add_argument('--img-path', dest='img_path', type=str,
                    default='/home/bina/PycharmProjects/tevel-segmentation/data/ADE20k_outdoors/relevant_images/ADE_train_00014944.png')
 parse.add_argument('--ann-path', dest='ann_path', type=str,
@@ -42,35 +43,29 @@ to_tensor = T.ToTensor(
     std=(0.2112, 0.2148, 0.2115),
 )
 
-im = cv2.imread(args.img_path)[:, :, ::-1]
-crop_h, crop_w = [512, 1024]
-scales = [0.25, 2]
-scale = np.random.uniform(min(scales), max(scales))
-im_h, im_w = [math.ceil(el * scale) for el in im.shape[:2]]
-im = cv2.resize(im, (im_w, im_h))
+data_loader = get_data_loader(cfg.im_root, cfg.demo_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
+                              cfg.max_iter, mode='val', distributed=False)
+img_path = os.path.join(os.path.dirname(args.res_path), 'img.jpg')
+label_path = os.path.join(os.path.dirname(args.res_path), 'label.jpg')
 
-pad_h, pad_w = 0, 0
-if im_h < crop_h:
-    pad_h = (crop_h - im_h) // 2 + 1
-if im_w < crop_w:
-    pad_w = (crop_w - im_w) // 2 + 1
-if pad_h > 0 or pad_w > 0:
-    im = np.pad(im, ((pad_h, pad_h), (pad_w, pad_w), (0, 0)))
+for iteration, (image, label) in enumerate(data_loader):
+    image = image.cuda()
+    label = label.cuda()
 
-im_h, im_w, _ = im.shape
-sh, sw = np.random.random(2)
-sh, sw = int(sh * (im_h - crop_h)), int(sw * (im_w - crop_w))
+    label = torch.squeeze(label, 1)
 
-im = im[sh:sh + crop_h, sw:sw + crop_w, :].copy()
+    # get logits
+    time0 = time.time()
+    logits, *logits_aux = net(image)
+    time1 = time.time()
+    print(f'Inference time on GTX 1080 Ti:    {time1 - time0:.2f} seconds')
+    out = logits[:1].argmax(dim=1).squeeze().detach().cpu().numpy()
+    label = label[:1].squeeze().detach().cpu().numpy()
 
-im = to_tensor(dict(im=im, lb=None))['im'].unsqueeze(0).cuda()
-
-# inference
-time0 = time.time()
-out = net(im)[0].argmax(dim=1).squeeze().detach().cpu().numpy()
-time1 = time.time()
-print(f'Inference time on GTX 1080 Ti:    {time1 - time0:.2f} seconds')
-
-# save inference
-pred = palette[out]
-cv2.imwrite(args.res_path, pred)
+    # save inference
+    pred = palette[out]
+    cv2.imwrite(args.res_path, pred)
+    img = cv2.imread(args.img_path)
+    cv2.imwrite(img_path, img)
+    label_to_show = palette[label]
+    cv2.imwrite(label_path, label_to_show)

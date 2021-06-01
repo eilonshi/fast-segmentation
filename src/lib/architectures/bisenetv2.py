@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from src.models.consts import NUM_CLASSES
 
@@ -65,6 +64,7 @@ class DetailBranch(nn.Module):
         feat = self.S1(x)
         feat = self.S2(feat)
         feat = self.S3(feat)
+
         return feat
 
 
@@ -105,6 +105,7 @@ class CEBlock(nn.Module):
         feat = self.conv_gap(feat)
         feat = feat + x
         feat = self.conv_last(feat)
+
         return feat
 
 
@@ -223,49 +224,34 @@ class BGALayer(nn.Module):
     def __init__(self):
         super(BGALayer, self).__init__()
         self.left1 = nn.Sequential(
-            nn.Conv2d(
-                128, 128, kernel_size=3, stride=1,
-                padding=1, groups=128, bias=False),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, groups=128, bias=False),
             nn.BatchNorm2d(128),
-            nn.Conv2d(
-                128, 128, kernel_size=1, stride=1,
-                padding=0, bias=False),
+            nn.Conv2d(128, 128, kernel_size=1, stride=1, padding=0, bias=False),
         )
         self.left2 = nn.Sequential(
-            nn.Conv2d(
-                128, 128, kernel_size=3, stride=2,
-                padding=1, bias=False),
+            nn.Conv2d(128, 128, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.AvgPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=False)
         )
         self.right1 = nn.Sequential(
-            nn.Conv2d(
-                128, 128, kernel_size=3, stride=1,
-                padding=1, bias=False),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(128),
         )
         self.right2 = nn.Sequential(
-            nn.Conv2d(
-                128, 128, kernel_size=3, stride=1,
-                padding=1, groups=128, bias=False),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, groups=128, bias=False),
             nn.BatchNorm2d(128),
-            nn.Conv2d(
-                128, 128, kernel_size=1, stride=1,
-                padding=0, bias=False),
+            nn.Conv2d(128, 128, kernel_size=1, stride=1, padding=0, bias=False),
         )
         self.up1 = nn.Upsample(scale_factor=4)
         self.up2 = nn.Upsample(scale_factor=4)
         # TODO: does this really has no relu?
         self.conv = nn.Sequential(
-            nn.Conv2d(
-                128, 128, kernel_size=3, stride=1,
-                padding=1, bias=False),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),  # not shown in paper
         )
 
     def forward(self, x_d, x_s):
-        dsize = x_d.size()[2:]
         left1 = self.left1(x_d)
         left2 = self.left2(x_d)
         right1 = self.right1(x_s)
@@ -275,6 +261,7 @@ class BGALayer(nn.Module):
         right = left2 * torch.sigmoid(right2)
         right = self.up2(right)
         out = self.conv(left + right)
+
         return out
 
 
@@ -326,7 +313,6 @@ class BiSeNetV2(nn.Module):
         self.init_weights()
 
     def forward(self, x):
-        size = x.size()[2:]
         feat_d = self.detail(x)
         feat2, feat3, feat4, feat5_4, feat_s = self.segment(x)
         feat_head = self.bga(feat_d, feat_s)
@@ -345,7 +331,8 @@ class BiSeNetV2(nn.Module):
         for name, module in self.named_modules():
             if isinstance(module, (nn.Conv2d, nn.Linear)):
                 nn.init.kaiming_normal_(module.weight, mode='fan_out')
-                if not module.bias is None: nn.init.constant_(module.bias, 0)
+                if module.bias is not None:
+                    nn.init.constant_(module.bias, 0)
             elif isinstance(module, nn.modules.batchnorm._BatchNorm):
                 if hasattr(module, 'last_bn') and module.last_bn:
                     nn.init.zeros_(module.weight)
@@ -396,11 +383,11 @@ if __name__ == "__main__":
     #  feat = segment(x)[0]
     #  print(feat.size())
     #
-    x = torch.randn(16, 3, 1024, 2048)
+    input_ = torch.randn(16, 3, 1024, 2048)
     model = BiSeNetV2(n_classes=NUM_CLASSES)
-    outs = model(x)
-    for out in outs:
-        print(out.size())
+    outputs = model(input_)
+    for output in outputs:
+        print(output.size())
     #  print(logits.size())
 
     #  for name, param in model.named_parameters():

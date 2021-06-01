@@ -40,6 +40,7 @@ class BaseDataset(Dataset):
             im_lb = self.trans_func(im_lb)
         im_lb = self.to_tensor(im_lb)
         img, label_ = im_lb['im'], im_lb['lb']
+
         return img.detach(), label_.unsqueeze(0).detach()
 
     def __len__(self):
@@ -81,6 +82,7 @@ class TransformationVal(object):
     def __call__(self, im_lb):
         im_lb = self.trans_func(im_lb)
         im, lb = im_lb['im'], im_lb['lb']
+
         return dict(im=im, lb=lb)
 
 

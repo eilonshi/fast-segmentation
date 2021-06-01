@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 import torch.distributed as dist
 
 from src.configs import cfg_factory
@@ -57,7 +57,7 @@ class MscEvalV0(object):
 
             for scale in self.scales:
                 s_h, s_w = int(scale * h), int(scale * w)
-                im_sc = F.interpolate(imgs, size=(s_h, s_w), mode='bilinear', align_corners=True)
+                im_sc = f.interpolate(imgs, size=(s_h, s_w), mode='bilinear', align_corners=True)
 
                 im_sc = im_sc.cuda()
                 if self.flip:
@@ -68,7 +68,7 @@ class MscEvalV0(object):
                 if self.flip:
                     logits = torch.flip(logits, dims=(3,))
 
-                logits = F.interpolate(logits, size=size, mode='bilinear', align_corners=True)
+                logits = f.interpolate(logits, size=size, mode='bilinear', align_corners=True)
                 probs += torch.softmax(logits, dim=1)
 
             # calc histogram of the predictions in each class
@@ -90,14 +90,8 @@ class MscEvalV0(object):
 
 class MscEvalCrop(object):
 
-    def __init__(
-            self,
-            crop_size=1024,
-            crop_stride=2. / 3,
-            flip=True,
-            scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75),
-            lb_ignore=255,
-    ):
+    def __init__(self, crop_size, crop_stride, flip=True, scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75), lb_ignore=255):
+
         self.scales = scales
         self.ignore_label = lb_ignore
         self.flip = flip
@@ -154,9 +148,9 @@ class MscEvalCrop(object):
     def scale_crop_eval(self, net, im, scale, n_classes):
         n, c, h, w = im.size()
         new_hw = [int(h * scale), int(w * scale)]
-        im = F.interpolate(im, new_hw, mode='bilinear', align_corners=True)
+        im = f.interpolate(im, new_hw, mode='bilinear', align_corners=True)
         prob = self.crop_eval(net, im, n_classes)
-        prob = F.interpolate(prob, (h, w), mode='bilinear', align_corners=True)
+        prob = f.interpolate(prob, (h, w), mode='bilinear', align_corners=True)
         return prob
 
     @torch.no_grad()
@@ -178,10 +172,8 @@ class MscEvalCrop(object):
             preds = torch.argmax(probs, dim=1)
 
             keep = label != self.ignore_label
-            hist += torch.bincount(
-                label[keep] * n_classes + preds[keep],
-                minlength=n_classes ** 2
-            ).view(n_classes, n_classes)
+            hist += torch.bincount(label[keep] * n_classes + preds[keep], minlength=n_classes ** 2). \
+                view(n_classes, n_classes)
 
         if self.distributed:
             dist.all_reduce(hist, dist.ReduceOp.SUM)
@@ -207,13 +199,8 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     mious.append(miou)
     logger.info('single mIOU is: %s\n', miou)
 
-    single_crop = MscEvalCrop(
-        crop_size=1024,
-        crop_stride=2. / 3,
-        flip=False,
-        scales=[1.],
-        lb_ignore=IGNORE_LABEL,
-    )
+    single_crop = MscEvalCrop(crop_size=cfg.crop_size, crop_stride=2. / 3, flip=False, scales=[1.],
+                              lb_ignore=IGNORE_LABEL)
     miou = single_crop(net, dl, NUM_CLASSES)
     heads.append('single_scale_crop')
     mious.append(miou)
@@ -225,13 +212,8 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     mious.append(miou)
     logger.info('ms flip mIOU is: %s\n', miou)
 
-    ms_flip_crop = MscEvalCrop(
-        crop_size=1024,
-        crop_stride=2. / 3,
-        flip=True,
-        scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
-        lb_ignore=IGNORE_LABEL,
-    )
+    ms_flip_crop = MscEvalCrop(crop_size=cfg.crop_size, crop_stride=2. / 3, flip=True,
+                               scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75], lb_ignore=IGNORE_LABEL)
     miou = ms_flip_crop(net, dl, NUM_CLASSES)
     heads.append('ms_flip_crop')
     mious.append(miou)
@@ -251,11 +233,7 @@ def evaluate(cfg_, weight_pth):
     is_dist = dist.is_initialized()
     if is_dist:
         local_rank = dist.get_rank()
-        net = nn.parallel.DistributedDataParallel(
-            net,
-            device_ids=[local_rank, ],
-            output_device=local_rank
-        )
+        net = nn.parallel.DistributedDataParallel(net, device_ids=[local_rank, ], output_device=local_rank)
 
     # evaluator
     heads, mious = eval_model(net, cfg_.ims_per_gpu, cfg_.im_root, cfg_.val_im_anns)

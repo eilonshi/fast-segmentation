@@ -1,8 +1,8 @@
-
 import math
 import torch
 from torch.utils.data.sampler import Sampler
 import torch.distributed as dist
+from typing import Optional, Sized
 
 
 class RepeatedDistSampler(Sampler):
@@ -24,7 +24,8 @@ class RepeatedDistSampler(Sampler):
         shuffle (optional): If true (default), sampler will shuffle the indices
     """
 
-    def __init__(self, dataset, num_imgs, num_replicas=None, rank=None, shuffle=True):
+    def __init__(self, dataset, num_imgs, data_source: Optional[Sized], num_replicas=None, rank=None, shuffle=True):
+        super().__init__(data_source)
         if num_replicas is None:
             if not dist.is_available():
                 raise RuntimeError("Requires distributed package to be available")
@@ -40,7 +41,6 @@ class RepeatedDistSampler(Sampler):
         self.total_size = self.num_imgs_rank * self.num_replicas
         self.num_imgs = num_imgs
         self.shuffle = shuffle
-
 
     def __iter__(self):
         # deterministically shuffle based on epoch
@@ -66,4 +66,3 @@ class RepeatedDistSampler(Sampler):
 
     def __len__(self):
         return self.num_imgs_rank
-

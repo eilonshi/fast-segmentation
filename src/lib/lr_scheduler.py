@@ -1,6 +1,3 @@
-#!/usr/bin/python
-# -*- encoding: utf-8 -*-
-
 import math
 from bisect import bisect_right
 import torch

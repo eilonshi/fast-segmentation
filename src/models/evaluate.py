@@ -15,7 +15,7 @@ import torch.distributed as dist
 from src.configs import cfg_factory
 from src.lib.architectures import model_factory
 from src.lib.logger import setup_logger
-from src.lib.cityscapes_cv2 import get_data_loader
+from src.lib.tevel_cv2 import get_data_loader
 from src.models.consts import IGNORE_LABEL, NUM_CLASSES
 
 

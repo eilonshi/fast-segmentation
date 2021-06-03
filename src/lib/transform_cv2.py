@@ -23,12 +23,13 @@ class RandomResizedCrop(object):
 
         crop_h, crop_w = self.size
         scale = np.random.uniform(min(self.scales), max(self.scales)) if self.is_random else 1.
-        im_h, im_w = [math.ceil(el * scale) for el in im.shape[:2]]
+        im_h, im_w = [math.ceil(el * scale) for el in self.size]
         im = cv2.resize(im, (im_w, im_h))
         lb = cv2.resize(lb, (im_w, im_h), interpolation=cv2.INTER_NEAREST)
 
         if (im_h, im_w) == (crop_h, crop_w):
             return dict(im=im, lb=lb)
+
         pad_h, pad_w = 0, 0
         if im_h < crop_h:
             pad_h = (crop_h - im_h) // 2 + 1
@@ -41,6 +42,7 @@ class RandomResizedCrop(object):
         im_h, im_w, _ = im.shape
         sh, sw = np.random.random(2)
         sh, sw = int(sh * (im_h - crop_h)), int(sw * (im_w - crop_w))
+
         return dict(
             im=im[sh:sh + crop_h, sw:sw + crop_w, :].copy(),
             lb=lb[sh:sh + crop_h, sw:sw + crop_w].copy()

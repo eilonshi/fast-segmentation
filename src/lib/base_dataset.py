@@ -8,7 +8,7 @@ class BaseDataset(Dataset):
 
     def __init__(self, data_root, ann_path, trans_func=None, mode='train'):
         super(BaseDataset, self).__init__()
-        assert mode in ('train', 'val', 'test')
+        assert mode in ('train', 'val', 'inference')
         self.mode = mode
         self.trans_func = trans_func
 
@@ -16,8 +16,6 @@ class BaseDataset(Dataset):
             mean=(0.3257, 0.3690, 0.3223),  # city, rgb
             std=(0.2112, 0.2148, 0.2115),
         )
-
-        self.lb_map = None
 
         with open(ann_path, 'r') as fr:
             pairs = fr.read().splitlines()
@@ -34,18 +32,19 @@ class BaseDataset(Dataset):
         im_pth, lb_pth = self.img_paths[idx], self.lb_paths[idx]
         assert cv2.imread(im_pth) is not None, im_pth
         assert cv2.imread(lb_pth, 0) is not None, lb_pth
+
         img, label_ = cv2.imread(im_pth)[:, :, ::-1], cv2.imread(lb_pth, 0)
         assert img.shape[:2] == label_.shape[:2], f'image: {im_pth}, label: {lb_pth}\n' \
                                                   f'image shape: {img.shape}, label shape: {label_.shape}'
-        if self.lb_map is not None:
-            label_ = self.lb_map[label_]
+
         im_lb = dict(im=img, lb=label_)
         if self.trans_func is not None:
             im_lb = self.trans_func(im_lb)
-        im_lb = self.to_tensor(im_lb)
-        img, label_ = im_lb['im'], im_lb['lb']
 
-        return img.detach(), label_.unsqueeze(0).detach()
+        im_lb_tensor = self.to_tensor(im_lb)
+        img_tensor, label_tensor = im_lb_tensor['im'], im_lb_tensor['lb']
+
+        return img_tensor.detach(), label_tensor.unsqueeze(0).detach()
 
     def __len__(self):
         return self.len
@@ -83,17 +82,14 @@ class TransformationVal(object):
         ])
 
     def __call__(self, im_lb):
-        im_lb = self.trans_func(im_lb)
-        im, lb = im_lb['im'], im_lb['lb']
-
-        return dict(im=im, lb=lb)
+        return self.trans_func(im_lb)
 
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader
-    from src.lib.cityscapes_cv2 import Cityscapes
+    from src.lib.tevel_cv2 import TevelDataset
 
-    ds = Cityscapes(data_root='data/', ann_path='data/val.txt', mode='val')
+    ds = TevelDataset(data_root='data/', ann_path='data/val.txt', mode='val')
     dl = DataLoader(ds,
                     batch_size=4,
                     shuffle=True,

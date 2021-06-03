@@ -18,7 +18,7 @@ from src.configs import cfg_factory
 from src.lib.soft_dice_loss import SoftDiceLoss
 from src.models.consts import NUM_CLASSES
 from src.lib.architectures import model_factory
-from src.lib.cityscapes_cv2 import get_data_loader
+from src.lib.tevel_cv2 import get_data_loader
 from src.lib.lr_scheduler import WarmupPolyLrScheduler
 from src.lib.meters import TimeMeter, AvgMeter
 from src.lib.logger import setup_logger, print_log_msg

@@ -1,16 +1,15 @@
 import torch
-from torch.utils.data import Dataset, DataLoader
 import torch.distributed as dist
+from torch.utils.data import Dataset, DataLoader
 
-from src.lib import transform_cv2 as t
 from src.lib.sampler import RepeatedDistSampler
 from src.lib.base_dataset import BaseDataset, TransformationTrain, TransformationVal
 from src.models.consts import NUM_CLASSES, NUM_WORKERS
 
 
-class Cityscapes(BaseDataset):
+class TevelDataset(BaseDataset):
     def __init__(self, data_root, ann_path, trans_func=None, mode='train'):
-        super(Cityscapes, self).__init__(data_root, ann_path, trans_func, mode)
+        super(TevelDataset, self).__init__(data_root, ann_path, trans_func, mode)
         self.n_cats = NUM_CLASSES
         self.lb_ignore = 255
 
@@ -29,7 +28,7 @@ def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_ite
     else:
         raise ValueError
 
-    ds_ = Cityscapes(data_path, ann_path, trans_func=trans_func, mode=mode)
+    ds_ = TevelDataset(data_path, ann_path, trans_func=trans_func, mode=mode)
 
     if distributed:
         assert dist.is_available(), "dist should be initialized"
@@ -38,7 +37,6 @@ def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_ite
             n_train_images = ims_per_gpu * dist.get_world_size() * max_iter
             sampler = RepeatedDistSampler(ds_, n_train_images, shuffle=shuffle, data_source=None)
         else:
-            # sampler = torch.utils.data.distributed.DistributedSampler(ds_, shuffle=shuffle)
             sampler = RepeatedDistSampler(ds_, ims_per_gpu, shuffle=shuffle, data_source=None)
         batch_sampler = torch.utils.data.sampler.BatchSampler(sampler, batch_size, drop_last=drop_last)
         dl_ = DataLoader(ds_, batch_sampler=batch_sampler, num_workers=NUM_WORKERS, pin_memory=True)
@@ -49,7 +47,7 @@ def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_ite
 
 
 if __name__ == "__main__":
-    ds = Cityscapes(data_root='./data/', ann_path='./data/val.txt', mode='val')
+    ds = TevelDataset(data_root='./data/', ann_path='./data/val.txt', mode='val')
     dl = DataLoader(ds, batch_size=2, shuffle=True, num_workers=NUM_WORKERS, drop_last=True)
     for images, label in dl:
         print(len(images))

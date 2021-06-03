@@ -1,19 +1,20 @@
 NUM_WORKERS = 1
 IGNORE_LABEL = 255
+OTHER_LABEL = 0
 
-LABEL_TO_COLOR = [
-    [0, 0, 0],  # other
-    [0, 50, 50],  # land
-    [0, 255, 0],  # trees
-    [50, 200, 0],  # buildings
-    [0, 150, 100],  # tents
-    [80, 100, 30],  # fences
-    [150, 255, 40],  # sky
-    [0, 30, 200],  # road
-    [90, 90, 200],  # country road
-    [200, 40, 130],  # windows
-    [250, 160, 100],  # cars
-    [200, 40, 0],  # people
-]
+LABEL_TO_COLOR = {
+    'other': [0, 0, 0],
+    'land': [29, 101, 181],
+    'trees': [0, 255, 0],
+    'buildings': [180, 180, 180],
+    'tents': [0, 20, 100],
+    'fences': [80, 100, 30],
+    'sky': [255, 248, 240],
+    'road': [50, 150, 250],
+    'country_road': [0, 200, 200],
+    'windows': [200, 40, 130],
+    'cars': [250, 0, 0],
+    'people': [0, 0, 255],
+}
 
 NUM_CLASSES = len(LABEL_TO_COLOR)

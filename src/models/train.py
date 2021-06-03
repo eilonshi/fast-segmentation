@@ -36,7 +36,7 @@ def parse_args():
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=0)
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
-    parse.add_argument('--finetune-from', type=str, default=None)
+    parse.add_argument('--finetune-from', type=str, default='../../models/model_final_0.pth')
     parse.add_argument('--amp', type=bool, default=True)
 
     return parse.parse_args()
@@ -107,12 +107,35 @@ def set_meters():
     loss_pre_meter = AvgMeter('loss_prem')
     loss_aux_meters = [AvgMeter('loss_aux{}'.format(i))
                        for i in range(cfg.num_aux_heads)]
+
     return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
+
+
+def log_ious(writer, mious, iteration, heads, logger, mode):
+    single_scale_miou, single_scale_crop_miou, ms_flip_miou, ms_flip_crop_miou = mious
+    writer.add_scalar(f"mIOU/{mode}/single_scale", single_scale_miou, iteration)
+    writer.add_scalar(f"mIOU/{mode}/single_scale_crop", single_scale_crop_miou, iteration)
+    writer.add_scalar(f"mIOU/{mode}/multi_scale_flip", ms_flip_miou, iteration)
+    writer.add_scalar(f"mIOU/{mode}/multi_scale_flip_crop", ms_flip_crop_miou, iteration)
+    logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
+
+
+def initialize_tensorboard_log_dir(root_dir):
+    i = 0
+    path = os.path.join(root_dir, str(i))
+    while os.path.exists(path):
+        i += 1
+        path = os.path.join(root_dir, str(i))
+    os.mkdir(path)
+
+    return path
 
 
 def train():
     logger = logging.getLogger()
-    writer = SummaryWriter(log_dir='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
+    tensorboard_log_dir = initialize_tensorboard_log_dir(
+        root_dir='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
+    writer = SummaryWriter(log_dir=tensorboard_log_dir)
     is_dist = dist.is_initialized()
 
     # set all components
@@ -120,9 +143,9 @@ def train():
                                   cfg.max_iter, mode='train', distributed=is_dist)
     net, criteria_pre, criteria_aux = set_model()
     optimizer = set_optimizer(net)
-    scaler = amp.GradScaler()    # mixed precision training
+    scaler = amp.GradScaler()  # mixed precision training
     net = set_model_dist(net)  # distributed training
-    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()    # metrics
+    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()  # metrics
     lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
                                          warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
 
@@ -178,14 +201,12 @@ def train():
             # evaluate the results
             logger.info('\nevaluating the model')
             torch.cuda.empty_cache()
-            heads, mious = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
-                                      im_anns=cfg.val_im_anns)
-            single_scale_miou, single_scale_crop_miou, ms_flip_miou, ms_flip_crop_miou = mious
-            writer.add_scalar("mIOU/train/single_scale", single_scale_miou, iteration)
-            writer.add_scalar("mIOU/train/single_scale_crop", single_scale_crop_miou, iteration)
-            writer.add_scalar("mIOU/train/multi_scale_flip", ms_flip_miou, iteration)
-            writer.add_scalar("mIOU/train/multi_scale_flip_crop", ms_flip_crop_miou, iteration)
-            logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
+            heads_val, mious_val = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
+                                              im_anns=cfg.val_im_anns)
+            log_ious(writer, mious_val, iteration, heads_val, logger, mode='val')
+            heads_train, mious_train = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
+                                                  im_anns=cfg.train_im_anns)
+            log_ious(writer, mious_train, iteration, heads_train, logger, mode='train')
 
         lr_scheduler.step()
 

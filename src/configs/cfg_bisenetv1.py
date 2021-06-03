@@ -14,5 +14,5 @@ cfg = dict(
     ims_per_gpu=8,
     use_fp16=True,
     use_sync_bn=False,
-    respth='./res',
+    log_path='./res',
 )

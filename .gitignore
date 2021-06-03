@@ -119,3 +119,7 @@ src/tensorrt/build/*
 *.JPG
 *.jpeg
 *.json
+*.csv
+
+# tensorboard logs
+*.0

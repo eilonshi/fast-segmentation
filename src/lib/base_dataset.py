@@ -1,8 +1,7 @@
 import os.path as osp
 from torch.utils.data import Dataset
 import cv2
-
-from src.lib import transform_cv2 as T
+from src.lib import transform_cv2 as t
 
 
 class BaseDataset(Dataset):
@@ -12,6 +11,11 @@ class BaseDataset(Dataset):
         assert mode in ('train', 'val', 'test')
         self.mode = mode
         self.trans_func = trans_func
+
+        self.to_tensor = t.ToTensor(
+            mean=(0.3257, 0.3690, 0.3223),  # city, rgb
+            std=(0.2112, 0.2148, 0.2115),
+        )
 
         self.lb_map = None
 
@@ -50,10 +54,10 @@ class BaseDataset(Dataset):
 class TransformationTrain(object):
 
     def __init__(self, scales, crop_size):
-        self.trans_func = T.Compose([
-            T.RandomResizedCrop(scales, crop_size),
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(
+        self.trans_func = t.Compose([
+            t.RandomResizedCrop(scales, crop_size),
+            t.RandomHorizontalFlip(),
+            t.ColorJitter(
                 brightness=0.4,
                 contrast=0.4,
                 saturation=0.4
@@ -69,10 +73,9 @@ class TransformationTrain(object):
 class TransformationVal(object):
 
     def __init__(self, scales, crop_size):
-        self.trans_func = T.Compose([
-            T.RandomResizedCrop(scales, crop_size),
-            T.RandomHorizontalFlip(),
-            T.ColorJitter(
+        self.trans_func = t.Compose([
+            t.RandomResizedCrop(scales, crop_size, is_random=False),
+            t.ColorJitter(
                 brightness=0.4,
                 contrast=0.4,
                 saturation=0.4

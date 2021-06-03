@@ -14,11 +14,6 @@ class Cityscapes(BaseDataset):
         self.n_cats = NUM_CLASSES
         self.lb_ignore = 255
 
-        self.to_tensor = t.ToTensor(
-            mean=(0.3257, 0.3690, 0.3223),  # city, rgb
-            std=(0.2112, 0.2148, 0.2115),
-        )
-
 
 def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_iter=None, mode='train', distributed=True):
     if mode == 'train':

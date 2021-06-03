@@ -9,9 +9,10 @@ class RandomResizedCrop(object):
     size should be a tuple of (H, W)
     """
 
-    def __init__(self, scales=(0.5, 1.), size=(384, 384)):
+    def __init__(self, scales=(0.5, 1.), size=(384, 384), is_random=True):
         self.scales = scales
         self.size = size
+        self.is_random = is_random
 
     def __call__(self, im_lb):
         if self.size is None:
@@ -21,7 +22,7 @@ class RandomResizedCrop(object):
         assert im.shape[:2] == lb.shape[:2], f'image shape is {im.shape}, label shape is {lb.shape}'
 
         crop_h, crop_w = self.size
-        scale = np.random.uniform(min(self.scales), max(self.scales))
+        scale = np.random.uniform(min(self.scales), max(self.scales)) if self.is_random else 1.
         im_h, im_w = [math.ceil(el * scale) for el in im.shape[:2]]
         im = cv2.resize(im, (im_w, im_h))
         lb = cv2.resize(lb, (im_w, im_h), interpolation=cv2.INTER_NEAREST)

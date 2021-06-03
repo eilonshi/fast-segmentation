@@ -248,9 +248,9 @@ def main():
                                 world_size=torch.cuda.device_count(),
                                 rank=args.local_rank
                                 )
-    if not osp.exists(cfg.respth):
-        os.makedirs(cfg.respth)
-    setup_logger('{}-eval'.format(cfg.model_type), cfg.respth)
+    if not osp.exists(cfg.log_path):
+        os.makedirs(cfg.log_path)
+    setup_logger('{}-eval'.format(cfg.model_type), cfg.log_path)
     evaluate(cfg, args.weight_pth)
 
 

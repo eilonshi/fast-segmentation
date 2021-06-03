@@ -15,10 +15,10 @@ from torch.backends import cudnn
 
 from evaluate import eval_model
 from src.configs import cfg_factory
+from src.lib.soft_dice_loss import SoftDiceLoss
 from src.models.consts import NUM_CLASSES
 from src.lib.architectures import model_factory
 from src.lib.cityscapes_cv2 import get_data_loader
-from src.lib.ohem_ce_loss import OHEMCrossEntropyLoss
 from src.lib.lr_scheduler import WarmupPolyLrScheduler
 from src.lib.meters import TimeMeter, AvgMeter
 from src.lib.logger import setup_logger, print_log_msg
@@ -56,8 +56,8 @@ def set_model():
 
     net.cuda()
     net.train()
-    criteria_pre = OHEMCrossEntropyLoss(0.7)
-    criteria_aux = [OHEMCrossEntropyLoss(0.7) for _ in range(cfg.num_aux_heads)]
+    criteria_pre = SoftDiceLoss()
+    criteria_aux = [SoftDiceLoss() for _ in range(cfg.num_aux_heads)]
 
     return net, criteria_pre, criteria_aux
 
@@ -131,6 +131,9 @@ def train():
         image = image.cuda()
         label = label.cuda()
 
+        if iteration == 0:
+            writer.add_graph(net, image)
+
         label = torch.squeeze(label, 1)
 
         optimizer.zero_grad()
@@ -163,10 +166,10 @@ def train():
         if (iteration + 1) % cfg.checkpoint_iters == 0:
             # save the model
             i = 0
-            while os.path.exists(os.path.join(cfg.respth, f"model_final_{i}.pth")):
+            while os.path.exists(os.path.join(cfg.models_path, f"model_final_{i}.pth")):
                 i += 1
-            log_pth = os.path.join(cfg.logpth, f"model_final_{i}.pth")
-            save_pth = os.path.join(cfg.respth, f"model_final_{i}.pth")
+            log_pth = os.path.join(cfg.log_path, f"model_final_{i}.pth")
+            save_pth = os.path.join(cfg.models_path, f"model_final_{i}.pth")
             logger.info('\nsave models to {}'.format(log_pth))
             state = net.module.state_dict()
             if dist.get_rank() == 0:
@@ -177,8 +180,11 @@ def train():
             torch.cuda.empty_cache()
             heads, mious = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
                                       im_anns=cfg.val_im_anns)
-            # TODO: add mious to tensorboard log
-            # writer.add_scalar("Loss/train", loss, iteration)
+            single_scale_miou, single_scale_crop_miou, ms_flip_miou, ms_flip_crop_miou = mious
+            writer.add_scalar("mIOU/train/single_scale", single_scale_miou, iteration)
+            writer.add_scalar("mIOU/train/single_scale_crop", single_scale_crop_miou, iteration)
+            writer.add_scalar("mIOU/train/multi_scale_flip", ms_flip_miou, iteration)
+            writer.add_scalar("mIOU/train/multi_scale_flip_crop", ms_flip_crop_miou, iteration)
             logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
         lr_scheduler.step()
@@ -196,9 +202,9 @@ def main():
         world_size=torch.cuda.device_count(),
         rank=args.local_rank
     )
-    if not osp.exists(cfg.respth):
-        os.makedirs(cfg.respth)
-    setup_logger('{}-train'.format(cfg.model_type), cfg.respth)
+    if not osp.exists(cfg.log_path):
+        os.makedirs(cfg.log_path)
+    setup_logger('{}-train'.format(cfg.model_type), cfg.log_path)
     train()
 
 

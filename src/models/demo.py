@@ -20,7 +20,7 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/models/model_final_0.pth')
+                       default='/home/bina/PycharmProjects/tevel-segmentation/models/3/best_model.pth')
     parse.add_argument('--demo-path', dest='demo_path', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/data/demo_results')
 
@@ -44,8 +44,10 @@ def get_image_and_label():
     with open(cfg.demo_im_anns) as ann_file:
         first_line = ann_file.readline()
     img_and_label = str.split(first_line, ',')
+
     image_original_path = os.path.join(cfg.im_root, img_and_label[0]).rstrip()
     label_original_path = os.path.join(cfg.im_root, img_and_label[1]).rstrip()
+
     image_original = np.asarray(cv2.imread(image_original_path))
     label_original = np.asarray(cv2.imread(label_original_path, 0))
 

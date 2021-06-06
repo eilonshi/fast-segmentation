@@ -1,2 +1,2 @@
-ADE20k_outdoors/relevant_images/ADE_train_00014944.png,ADE20k_outdoors/relevant_annotations/ADE_train_00014944.png
-ADE20k_outdoors/relevant_images/ADE_train_00015969.png,ADE20k_outdoors/relevant_annotations/ADE_train_00015969.png
+barak/relevant_images/IMG_100068_w.png,barak/relevant_annotations/IMG_100068_w.png
+barak/relevant_images/IMG_100174_w.png,barak/relevant_annotations/IMG_100174_w.png

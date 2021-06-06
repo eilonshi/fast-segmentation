@@ -15,6 +15,7 @@ cfg = dict(
     val_im_anns='/home/bina/PycharmProjects/tevel-segmentation/data/val.txt',
     demo_im_anns='/home/bina/PycharmProjects/tevel-segmentation/data/demo.txt',
     log_path='/home/bina/PycharmProjects/tevel-segmentation/logs/regular_logs',
+    tensorboard_path='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs',
     models_path='/home/bina/PycharmProjects/tevel-segmentation/models',
     scales=[0.25, 2.],
     crop_size=(512, 768),

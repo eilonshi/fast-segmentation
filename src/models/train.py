@@ -36,7 +36,7 @@ def parse_args():
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=0)
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
-    parse.add_argument('--finetune-from', type=str, default='../../models/model_final_0.pth')
+    parse.add_argument('--finetune-from', type=str, default='../../models/3/best_model.pth')
     parse.add_argument('--amp', type=bool, default=True)
 
     return parse.parse_args()
@@ -120,7 +120,7 @@ def log_ious(writer, mious, iteration, heads, logger, mode):
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
 
-def initialize_tensorboard_log_dir(root_dir):
+def get_next_dir_name(root_dir):
     i = 0
     path = os.path.join(root_dir, str(i))
     while os.path.exists(path):
@@ -133,8 +133,10 @@ def initialize_tensorboard_log_dir(root_dir):
 
 def train():
     logger = logging.getLogger()
-    tensorboard_log_dir = initialize_tensorboard_log_dir(
-        root_dir='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
+    tensorboard_log_dir = get_next_dir_name(
+        root_dir=cfg.tensorboard_path)
+    models_dir = get_next_dir_name(
+        root_dir=cfg.models_path)
     writer = SummaryWriter(log_dir=tensorboard_log_dir)
     is_dist = dist.is_initialized()
 
@@ -148,6 +150,7 @@ def train():
     time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()  # metrics
     lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
                                          warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
+    best_score = 0
 
     # train loop
     for iteration, (image, label) in enumerate(data_loader):
@@ -189,10 +192,10 @@ def train():
         if (iteration + 1) % cfg.checkpoint_iters == 0:
             # save the model
             i = 0
-            while os.path.exists(os.path.join(cfg.models_path, f"model_final_{i}.pth")):
+            while os.path.exists(os.path.join(models_dir, f"model_final_{i}.pth")):
                 i += 1
             log_pth = os.path.join(cfg.log_path, f"model_final_{i}.pth")
-            save_pth = os.path.join(cfg.models_path, f"model_final_{i}.pth")
+            save_pth = os.path.join(models_dir, f"model_final_{i}.pth")
             logger.info('\nsave models to {}'.format(log_pth))
             state = net.module.state_dict()
             if dist.get_rank() == 0:
@@ -207,6 +210,13 @@ def train():
             heads_train, mious_train = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
                                                   im_anns=cfg.train_im_anns)
             log_ious(writer, mious_train, iteration, heads_train, logger, mode='train')
+
+            if mious_val[0] > best_score:
+                best_score = mious_val[0]
+                save_pth = os.path.join(models_dir, f"best_model.pth")
+                state = net.module.state_dict()
+                if dist.get_rank() == 0:
+                    torch.save(state, save_pth)
 
         lr_scheduler.step()
 

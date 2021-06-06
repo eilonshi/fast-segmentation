@@ -52,6 +52,10 @@ def filter_data_folder(mapping_dict_, irrelevant_labels_, old_ann_folder_, new_a
             for old_label in old_labels:
                 new_ann[old_ann == old_label] = new_label
 
+        # take only the width and height of the image
+        if len(new_ann.shape) == 3:
+            new_ann = new_ann[:, :, 1]
+
         # save annotation and matching image
         if BUILDING_LABEL in new_ann:
             relevant_images_counter += 1
@@ -124,28 +128,28 @@ def create_train_val_test_txt_files(output_path, data_directories, train_val_tes
 
 
 if __name__ == '__main__':
-    # ADE
-    base_path = 'data/ADE20k_outdoors'
-    old_img_folder = os.path.join(base_path, 'images/training')
-    new_img_folder = os.path.join(base_path, 'relevant_images')
-    old_ann_folder = os.path.join(base_path, 'annotations/training')
-    new_ann_folder = os.path.join(base_path, 'relevant_annotations')
-    mapping_dict = MAPPING_DICT_ADE
-    irrelevant_labels = IRRELEVANT_LABELS_ADE
-    filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
-
-    # CITYSCAPES
-    base_path = 'data/cityscapes'
-    old_img_folder = os.path.join(base_path, 'leftImg8bit')
-    new_img_folder = os.path.join(base_path, 'relevant_images')
-    old_ann_folder = os.path.join(base_path, 'gtFine')
-    new_ann_folder = os.path.join(base_path, 'relevant_annotations')
-    mapping_dict = MAPPING_DICT_CITYSCAPES
-    irrelevant_labels = IRRELEVANT_LABELS_CITYSCAPES
-    filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
+    # # ADE
+    # base_path = 'data/ADE20k_outdoors'
+    # old_img_folder = os.path.join(base_path, 'images/training')
+    # new_img_folder = os.path.join(base_path, 'relevant_images')
+    # old_ann_folder = os.path.join(base_path, 'annotations/training')
+    # new_ann_folder = os.path.join(base_path, 'relevant_annotations')
+    # mapping_dict = MAPPING_DICT_ADE
+    # irrelevant_labels = IRRELEVANT_LABELS_ADE
+    # filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
+    #
+    # # CITYSCAPES
+    # base_path = 'data/cityscapes'
+    # old_img_folder = os.path.join(base_path, 'leftImg8bit')
+    # new_img_folder = os.path.join(base_path, 'relevant_images')
+    # old_ann_folder = os.path.join(base_path, 'gtFine')
+    # new_ann_folder = os.path.join(base_path, 'relevant_annotations')
+    # mapping_dict = MAPPING_DICT_CITYSCAPES
+    # irrelevant_labels = IRRELEVANT_LABELS_CITYSCAPES
+    # filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
 
     # BARAK
-    base_path = 'data/barak'
+    base_path = '../../data/barak'
     old_img_folder = os.path.join(base_path, 'images')
     new_img_folder = os.path.join(base_path, 'relevant_images')
     old_ann_folder = os.path.join(base_path, 'annotations')
@@ -154,14 +158,14 @@ if __name__ == '__main__':
     irrelevant_labels = IRRELEVANT_LABELS_BARAK
     filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
 
-    # create train, val, test txt files
-    base_path = 'data'
-
-    data_dirs = [
-        'ADE20k_outdoors',
-        'cityscapes',
-        'barak'
-    ]
-
-    create_train_val_test_txt_files(output_path=base_path, data_directories=data_dirs,
-                                    train_val_test_ratio=[TRAIN_PERCENT, VAL_PERCENT, TEST_PERCENT])
+    # # create train, val, test txt files
+    # base_path = 'data'
+    #
+    # data_dirs = [
+    #     'ADE20k_outdoors',
+    #     'cityscapes',
+    #     'barak'
+    # ]
+    #
+    # create_train_val_test_txt_files(output_path=base_path, data_directories=data_dirs,
+    #                                 train_val_test_ratio=[TRAIN_PERCENT, VAL_PERCENT, TEST_PERCENT])

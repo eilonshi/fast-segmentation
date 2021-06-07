@@ -20,7 +20,7 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/models/3/best_model.pth')
+                       default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth')
     parse.add_argument('--demo-path', dest='demo_path', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/data/demo_results')
 

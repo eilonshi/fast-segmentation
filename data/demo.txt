@@ -1,2 +1,2 @@
-barak/relevant_images/IMG_100068_w.png,barak/relevant_annotations/IMG_100068_w.png
+tevel_examples/tevel_3.png,tevel_examples/ann_3.png
 barak/relevant_images/IMG_100174_w.png,barak/relevant_annotations/IMG_100174_w.png

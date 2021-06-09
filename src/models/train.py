@@ -50,7 +50,7 @@ def set_model():
     net = model_factory[cfg.model_type](NUM_CLASSES)
 
     if args.finetune_from is not None:
-        net.load_state_dict(torch.load(args.finetune_from, map_location='cpu'))
+        net.load_state_dict(torch.load(args.finetune_from))
     if cfg.use_sync_bn:
         net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
 

@@ -3,6 +3,8 @@ import os.path as osp
 import logging
 import argparse
 import math
+
+import cv2
 from tabulate import tabulate
 
 from tqdm import tqdm
@@ -16,7 +18,8 @@ from src.configs import cfg_factory
 from src.lib.architectures import model_factory
 from src.lib.logger import setup_logger
 from src.lib.tevel_cv2 import get_data_loader
-from src.models.consts import IGNORE_LABEL, NUM_CLASSES
+from src.models.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
+from src.visualization.visualize import save_labels_mask_with_legend
 
 
 def parse_args():
@@ -24,7 +27,7 @@ def parse_args():
     parse.add_argument('--local_rank', dest='local_rank',
                        type=int, default=-1, )
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/models/model_final_0.pth', )
+                       default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth', )
     parse.add_argument('--port', dest='port', type=int, default=44553, )
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2', )
     return parse.parse_args()
@@ -155,25 +158,38 @@ class MscEvalCrop(object):
 
     @torch.no_grad()
     def __call__(self, net, dl, n_classes):
-        dloader = dl if self.distributed and not dist.get_rank() == 0 else tqdm(dl)
+        data_loader = dl if self.distributed and not dist.get_rank() == 0 else tqdm(dl)
 
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
         hist.requires_grad_(False)
 
-        for i, (imgs, label) in enumerate(dloader):
+        for i, (imgs, label) in enumerate(data_loader):
             imgs = imgs.cuda()
             label = label.squeeze(1).cuda()
             n, h, w = label.shape
             probs = torch.zeros((n, n_classes, h, w)).cuda()
             probs.requires_grad_(False)
+
             for sc in self.scales:
                 probs += self.scale_crop_eval(net, imgs, sc, n_classes)
+
             torch.cuda.empty_cache()
             preds = torch.argmax(probs, dim=1)
 
             keep = label != self.ignore_label
-            hist += torch.bincount(label[keep] * n_classes + preds[keep], minlength=n_classes ** 2). \
+            cur_hist = torch.zeros(n_classes, n_classes).cuda().detach()
+
+            bin_count = torch.bincount(label[keep] * n_classes + preds[keep], minlength=n_classes ** 2). \
                 view(n_classes, n_classes)
+            cur_hist += bin_count
+            cur_miou = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
+            cur_miou[cur_miou != cur_miou] = 0  # replace nan with zero
+            cur_miou = cur_miou.mean()
+
+            if cur_miou < BAD_IOU:
+                save_in_false_analysis(imgs, cfg.false_analysis_path)
+
+            hist += bin_count
 
         if self.distributed:
             dist.all_reduce(hist, dist.ReduceOp.SUM)
@@ -181,7 +197,17 @@ class MscEvalCrop(object):
         ious = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
         ious[ious != ious] = 0  # replace nan with zero
         miou = ious.mean()
+
         return miou.item()
+
+
+def save_in_false_analysis(images, path):
+    images_channels_last = images.permute([0, 2, 3, 1])
+
+    for i, image in enumerate(images_channels_last):
+        image = image.detach().cpu().numpy()
+        file_name = os.path.join(path, f'img{i}.jpg')
+        save_labels_mask_with_legend(mask=image, save_path=file_name)
 
 
 @torch.no_grad()
@@ -218,6 +244,7 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     heads.append('ms_flip_crop')
     mious.append(miou)
     logger.info('ms crop mIOU is: %s\n', miou)
+
     return heads, mious
 
 

@@ -1,6 +1,7 @@
 NUM_WORKERS = 1
 IGNORE_LABEL = 255
 OTHER_LABEL = 0
+BAD_IOU = 0.3
 
 LABEL_TO_COLOR = {
     'other': [0, 0, 0],

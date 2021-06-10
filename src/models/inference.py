@@ -12,7 +12,6 @@ from src.models.utils import get_model
 from src.visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
-np.random.seed(123)
 
 
 def parse_args():

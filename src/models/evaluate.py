@@ -4,7 +4,6 @@ import logging
 import argparse
 import math
 
-import cv2
 from tabulate import tabulate
 
 from tqdm import tqdm

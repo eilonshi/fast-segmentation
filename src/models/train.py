@@ -51,7 +51,7 @@ def get_losses():
     return criteria_pre, criteria_aux
 
 
-def set_optimizer(model):
+def get_optimizer(model):
     wd_params, non_wd_params = [], []
 
     for name, param in model.named_parameters():
@@ -69,7 +69,7 @@ def set_optimizer(model):
     return optimizer
 
 
-def set_meters():
+def get_meters():
     time_meter = TimeMeter(cfg.max_iter)
     loss_meter = AvgMeter('loss')
     loss_pre_meter = AvgMeter('loss_prem')
@@ -139,10 +139,10 @@ def train():
     net = get_model(cfg.model_type, is_train=True, is_distributed=is_dist, model_to_load=args.finetune_from,
                     use_sync_bn=cfg.use_sync_bn)
     criteria_pre, criteria_aux = get_losses()
-    optimizer = set_optimizer(net)
+    optimizer = get_optimizer(net)
     scaler = amp.GradScaler()  # mixed precision training
-    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = set_meters()  # metrics
-    lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter=cfg.max_iter, warmup_iter=cfg.warmup_iters,
+    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = get_meters()  # metrics
+    lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter_=cfg.max_iter, warmup_iter=cfg.warmup_iters,
                                          warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
     best_score = 0
 
@@ -191,7 +191,7 @@ def train():
     writer.close()
 
 
-def main():
+if __name__ == "__main__":
     torch.cuda.empty_cache()
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(
@@ -200,11 +200,9 @@ def main():
         world_size=torch.cuda.device_count(),
         rank=args.local_rank
     )
+
     if not osp.exists(cfg.log_path):
         os.makedirs(cfg.log_path)
+
     setup_logger('{}-train'.format(cfg.model_type), cfg.log_path)
     train()
-
-
-if __name__ == "__main__":
-    main()

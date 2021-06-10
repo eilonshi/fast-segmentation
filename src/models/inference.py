@@ -6,8 +6,8 @@ import cv2
 import matplotlib.pyplot as plt
 
 from src.lib.tevel_cv2 import TransformationVal
-from src.lib.transform_cv2 import image_to_tensor
 from src.configs import cfg_factory
+from src.lib.transform_cv2 import ToTensor
 from src.models.utils import get_model
 from src.visualization.visualize import save_labels_mask_with_legend
 
@@ -52,9 +52,9 @@ def preprocess_image(image):
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     image_label = {'image': image_rgb, 'label': label}
-    image_cropped = TransformationVal(cfg.crop_size)(image_label)['image']
+    image_label_cropped = TransformationVal(cfg.crop_size)(image_label)
 
-    image_tensor = image_to_tensor(image_cropped)
+    image_tensor = ToTensor()(image_label_cropped)['image']
     image_tensor = torch.unsqueeze(image_tensor, 0)
     image_tensor = image_tensor.cuda()
 

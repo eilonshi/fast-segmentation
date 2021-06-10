@@ -5,10 +5,9 @@ import torch
 import torch.distributed as dist
 from torch.utils.data import Dataset, DataLoader
 from src.lib import transform_cv2 as t
-from src.lib.consts import STD, MEAN
 
 from src.lib.sampler import RepeatedDistSampler
-from src.lib.transform_cv2 import image_to_tensor, label_to_tensor
+from src.lib.transform_cv2 import ToTensor
 from src.models.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
 
 
@@ -21,6 +20,7 @@ class TevelDataset(Dataset):
         self.label_ignore = IGNORE_LABEL
         self.mode = mode
         self.trans_func = trans_func
+        self.to_tensor = ToTensor()
 
         with open(ann_path, 'r') as fr:
             pairs = fr.read().splitlines()
@@ -47,8 +47,8 @@ class TevelDataset(Dataset):
         if self.trans_func is not None:
             image_label = self.trans_func(image_label)
 
-        img_tensor = image_to_tensor(image_label['image'], mean=MEAN, std=STD)
-        label_tensor = label_to_tensor(image_label['label'])
+        image_label = self.to_tensor(image_label)
+        img_tensor, label_tensor = image_label['image'], image_label['label']
 
         return img_tensor.detach(), label_tensor.unsqueeze(0).detach()
 

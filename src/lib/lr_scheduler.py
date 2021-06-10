@@ -20,8 +20,8 @@ class WarmupLrScheduler(torch.optim.lr_scheduler._LRScheduler):
 
     def get_lr(self):
         ratio = self.get_lr_ratio()
-        lrs = [ratio * lr for lr in self.base_lrs]
-        return lrs
+        lrs_ = [ratio * lr_ for lr_ in self.base_lrs]
+        return lrs_
 
     def get_lr_ratio(self):
         if self.last_epoch < self.warmup_iter:
@@ -40,6 +40,9 @@ class WarmupLrScheduler(torch.optim.lr_scheduler._LRScheduler):
             ratio = self.warmup_ratio + (1 - self.warmup_ratio) * alpha
         elif self.warmup == 'exp':
             ratio = self.warmup_ratio ** (1. - alpha)
+        else:
+            raise ValueError
+
         return ratio
 
 
@@ -49,14 +52,14 @@ class WarmupPolyLrScheduler(WarmupLrScheduler):
             self,
             optimizer,
             power,
-            max_iter,
+            max_iter_,
             warmup_iter=500,
             warmup_ratio=5e-4,
             warmup='exp',
             last_epoch=-1,
     ):
         self.power = power
-        self.max_iter = max_iter
+        self.max_iter = max_iter_
         super(WarmupPolyLrScheduler, self).__init__(
             optimizer, warmup_iter, warmup_ratio, warmup, last_epoch)
 
@@ -96,7 +99,7 @@ class WarmupCosineLrScheduler(WarmupLrScheduler):
     def __init__(
             self,
             optimizer,
-            max_iter,
+            max_iter_,
             eta_ratio=0,
             warmup_iter=500,
             warmup_ratio=5e-4,
@@ -104,13 +107,13 @@ class WarmupCosineLrScheduler(WarmupLrScheduler):
             last_epoch=-1,
     ):
         self.eta_ratio = eta_ratio
-        self.max_iter = max_iter
+        self.max_iter = max_iter_
         super(WarmupCosineLrScheduler, self).__init__(
             optimizer, warmup_iter, warmup_ratio, warmup, last_epoch)
 
     def get_main_ratio(self):
-        real_iter = self.last_epoch - self.warmup_iter
         real_max_iter = self.max_iter - self.warmup_iter
+
         return self.eta_ratio + (1 - self.eta_ratio) * (
                 1 + math.cos(math.pi * self.last_epoch / real_max_iter)) / 2
 
@@ -150,13 +153,11 @@ if __name__ == "__main__":
         print(lr)
         lrs.append(lr)
         lr_scheduler.step()
-    import matplotlib
     import matplotlib.pyplot as plt
     import numpy as np
+
     lrs = np.array(lrs)
     n_lrs = len(lrs)
     plt.plot(np.arange(n_lrs), lrs)
     plt.grid()
     plt.show()
-
-

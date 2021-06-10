@@ -102,19 +102,19 @@ class MscEvalCrop(object):
         self.crop_size = crop_size if isinstance(crop_size, (list, tuple)) else (crop_size, crop_size)
         self.crop_stride = crop_stride
 
-    def pad_tensor(self, inten):
-        n, c, h, w = inten.size()
+    def pad_tensor(self, in_tensor):
+        n, c, h, w = in_tensor.size()
         crop_h, crop_w = self.crop_size
         if crop_h < h and crop_w < w:
-            return inten, [0, h, 0, w]
+            return in_tensor, [0, h, 0, w]
         pad_h, pad_w = max(crop_h, h), max(crop_w, w)
-        outten = torch.zeros(n, c, pad_h, pad_w).cuda()
-        outten.requires_grad_(False)
+        out_tensor = torch.zeros(n, c, pad_h, pad_w).cuda()
+        out_tensor.requires_grad_(False)
         margin_h, margin_w = pad_h - h, pad_w - w
         hst, hed = margin_h // 2, margin_h // 2 + h
         wst, wed = margin_w // 2, margin_w // 2 + w
-        outten[:, :, hst:hed, wst:wed] = inten
-        return outten, [hst, hed, wst, wed]
+        out_tensor[:, :, hst:hed, wst:wed] = in_tensor
+        return out_tensor, [hst, hed, wst, wed]
 
     def eval_chip(self, net, crop):
         prob = net(crop)[0].softmax(dim=1)

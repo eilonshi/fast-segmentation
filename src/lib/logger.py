@@ -12,16 +12,16 @@ import torch.distributed as dist
 def setup_logger(name, log_path):
     logfile = '{}-{}.log'.format(name, time.strftime('%Y-%m-%d-%H-%M-%S'))
     logfile = osp.join(log_path, logfile)
-    FORMAT = '%(levelname)s %(filename)s(%(lineno)d): %(message)s'
+    format_ = '%(levelname)s %(filename)s(%(lineno)d): %(message)s'
     log_level = logging.INFO
     if dist.is_initialized() and dist.get_rank() != 0:
         log_level = logging.WARNING
-    logging.basicConfig(level=log_level, format=FORMAT, filename=logfile)
+    logging.basicConfig(level=log_level, format=format_, filename=logfile)
     logging.root.addHandler(logging.StreamHandler())
 
 
 def print_log_msg(it, max_iter, lr, time_meter, loss_meter, loss_pre_meter, loss_aux_meters):
-    t_intv, eta = time_meter.get()
+    time_interval, eta = time_meter.get()
     loss_avg, _ = loss_meter.get()
     loss_pre_avg, _ = loss_pre_meter.get()
     loss_aux_avg = ', '.join(['{}: {:.4f}'.format(el.name, el.get()[0]) for el in loss_aux_meters])
@@ -36,7 +36,7 @@ def print_log_msg(it, max_iter, lr, time_meter, loss_meter, loss_pre_meter, loss
         it=it + 1,
         max_it=max_iter,
         lr=lr,
-        time=t_intv,
+        time=time_interval,
         eta=eta,
         loss=loss_avg,
         loss_pre=loss_pre_avg,

@@ -119,56 +119,26 @@ class ColorJitter(object):
         return table[im]
 
 
-def label_random_resize_and_crop(image, scales=(0.5, 1.), size=(384, 384), is_random=True, is_label=False):
-    if size is None:
-        return image
+class ToTensor(object):
+    """Convert ndarrays in sample to Tensors."""
 
-    crop_h, crop_w = size
-    scale = np.random.uniform(min(scales), max(scales)) if is_random else 1.
-    im_h, im_w = [math.ceil(el * scale) for el in size]
-    interpolation = cv2.INTER_NEAREST if is_label else cv2.INTER_LINEAR
-    image = cv2.resize(image, (im_w, im_h), interpolation=interpolation)
+    def __init__(self, mean=MEAN, std=STD):
+        self.mean = mean
+        self.std = std
 
-    if (im_h, im_w) == (crop_h, crop_w):
-        return image
+    def __call__(self, image_label):
+        image, label = image_label['image'], image_label['label']
+        if label is not None:
+            label = torch.from_numpy(label.astype(np.int64).copy()).clone()
 
-    pad_h, pad_w = 0, 0
-    if im_h < crop_h:
-        pad_h = (crop_h - im_h) // 2 + 1
-    if im_w < crop_w:
-        pad_w = (crop_w - im_w) // 2 + 1
-    if pad_h > 0 or pad_w > 0:
-        if is_label:
-            image = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), 'constant', constant_values=255)
-        else:
-            image = np.pad(image, ((pad_h, pad_h), (pad_w, pad_w), (0, 0)))
+        image = image.transpose(2, 0, 1).astype(np.float32)
+        image = torch.from_numpy(image).div_(255)
+        dtype, device = image.dtype, image.device
+        mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
+        std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
+        image = image.sub_(mean).div_(std).clone()
 
-    im_h, im_w, _ = image.shape
-    sh, sw = np.random.random(2)
-    sh, sw = int(sh * (im_h - crop_h)), int(sw * (im_w - crop_w))
-
-    if is_label:
-        return image[sh:sh + crop_h, sw:sw + crop_w]
-
-    return image[sh:sh + crop_h, sw:sw + crop_w, :]
-
-
-def label_to_tensor(label):
-    if label is not None:
-        label = torch.from_numpy(label.astype(np.int64).copy()).clone()
-
-    return label
-
-
-def image_to_tensor(image, mean=MEAN, std=STD):
-    im = image.transpose(2, 0, 1).astype(np.float32)
-    im = torch.from_numpy(im).div_(255)
-    dtype, device = im.dtype, im.device
-    mean = torch.as_tensor(mean, dtype=dtype, device=device)[:, None, None]
-    std = torch.as_tensor(std, dtype=dtype, device=device)[:, None, None]
-    im = im.sub_(mean).div_(std).clone()
-
-    return im
+        return {'image': image, 'label': label}
 
 
 class Compose(object):

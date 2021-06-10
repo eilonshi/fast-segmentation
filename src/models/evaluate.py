@@ -92,10 +92,10 @@ class MscEvalV0(object):
 
 class MscEvalCrop(object):
 
-    def __init__(self, crop_size, crop_stride, flip=True, scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75), lb_ignore=255):
+    def __init__(self, crop_size, crop_stride, flip=True, scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75), label_ignore=255):
 
         self.scales = scales
-        self.ignore_label = lb_ignore
+        self.ignore_label = label_ignore
         self.flip = flip
         self.distributed = dist.is_initialized()
 
@@ -225,7 +225,7 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     logger.info('single mIOU is: %s\n', miou)
 
     single_crop = MscEvalCrop(crop_size=cfg.crop_size, crop_stride=2. / 3, flip=False, scales=[1.],
-                              lb_ignore=IGNORE_LABEL)
+                              label_ignore=IGNORE_LABEL)
     miou = single_crop(net, dl, NUM_CLASSES)
     heads.append('single_scale_crop')
     mious.append(miou)
@@ -238,7 +238,7 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     logger.info('ms flip mIOU is: %s\n', miou)
 
     ms_flip_crop = MscEvalCrop(crop_size=cfg.crop_size, crop_stride=2. / 3, flip=True,
-                               scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75], lb_ignore=IGNORE_LABEL)
+                               scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75], label_ignore=IGNORE_LABEL)
     miou = ms_flip_crop(net, dl, NUM_CLASSES)
     heads.append('ms_flip_crop')
     mious.append(miou)

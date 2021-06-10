@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from src.lib.tevel_cv2 import TransformationInference
+from src.lib.tevel_cv2 import TransformationVal
 from src.lib.transform_cv2 import image_to_tensor
 from src.configs import cfg_factory
 from src.models.utils import get_model
@@ -43,13 +43,22 @@ def read_image_and_label():
     return image, label
 
 
+def create_empty_label(image):
+    return np.zeros(image.shape[:2])
+
+
 def preprocess_image(image):
-    trans_func = TransformationInference(cfg.crop_size)
+    label = create_empty_label(image)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image_cropped = trans_func(image_rgb)
+
+    image_label = {'image': image_rgb, 'label': label}
+    image_cropped = TransformationVal(cfg.crop_size)(image_label)['image']
+
     image_tensor = image_to_tensor(image_cropped)
     image_tensor = torch.unsqueeze(image_tensor, 0)
     image_tensor = image_tensor.cuda()
+
+    # TODO: test that the processed image is the same as in the train
 
     return image_tensor
 

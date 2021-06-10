@@ -9,7 +9,7 @@ from src.lib.consts import STD, MEAN
 
 from src.lib.sampler import RepeatedDistSampler
 from src.lib.transform_cv2 import image_to_tensor, label_to_tensor
-from src.models.consts import NUM_CLASSES, NUM_WORKERS
+from src.models.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
 
 
 class TevelDataset(Dataset):
@@ -18,37 +18,37 @@ class TevelDataset(Dataset):
         assert mode in ('train', 'val')
 
         self.n_cats = NUM_CLASSES
-        self.lb_ignore = 255
+        self.label_ignore = IGNORE_LABEL
         self.mode = mode
         self.trans_func = trans_func
 
         with open(ann_path, 'r') as fr:
             pairs = fr.read().splitlines()
-        self.img_paths, self.lb_paths = [], []
+        self.img_paths, self.label_paths = [], []
 
         for pair in pairs:
-            img_pth, lb_pth = pair.split(',')
+            img_pth, label_pth = pair.split(',')
             self.img_paths.append(osp.join(data_root, img_pth))
-            self.lb_paths.append(osp.join(data_root, lb_pth))
+            self.label_paths.append(osp.join(data_root, label_pth))
 
-        assert len(self.img_paths) == len(self.lb_paths)
+        assert len(self.img_paths) == len(self.label_paths)
         self.len = len(self.img_paths)
 
     def __getitem__(self, idx):
-        im_pth, lb_pth = self.img_paths[idx], self.lb_paths[idx]
+        im_pth, label_pth = self.img_paths[idx], self.label_paths[idx]
         assert cv2.imread(im_pth) is not None, im_pth
-        assert cv2.imread(lb_pth, 0) is not None, lb_pth
+        assert cv2.imread(label_pth, 0) is not None, label_pth
 
-        img, label_ = cv2.cvtColor(cv2.imread(im_pth), cv2.COLOR_BGR2RGB), cv2.imread(lb_pth, 0)
-        assert img.shape[:2] == label_.shape[:2], f'image: {im_pth}, label: {lb_pth}\n' \
+        img, label_ = cv2.cvtColor(cv2.imread(im_pth), cv2.COLOR_BGR2RGB), cv2.imread(label_pth, 0)
+        assert img.shape[:2] == label_.shape[:2], f'image: {im_pth}, label: {label_pth}\n' \
                                                   f'image shape: {img.shape}, label shape: {label_.shape}'
 
-        im_lb = dict(im=img, lb=label_)
+        image_label = dict(image=img, label=label_)
         if self.trans_func is not None:
-            im_lb = self.trans_func(im_lb)
+            image_label = self.trans_func(image_label)
 
-        img_tensor = image_to_tensor(im_lb['im'], mean=MEAN, std=STD)
-        label_tensor = label_to_tensor(im_lb['lb'])
+        img_tensor = image_to_tensor(image_label['image'], mean=MEAN, std=STD)
+        label_tensor = label_to_tensor(image_label['label'])
 
         return img_tensor.detach(), label_tensor.unsqueeze(0).detach()
 
@@ -65,10 +65,10 @@ class TransformationTrain(object):
             t.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4)
         ])
 
-    def __call__(self, im_lb):
-        im_lb = self.trans_func(im_lb)
+    def __call__(self, image_label):
+        image_label = self.trans_func(image_label)
 
-        return im_lb
+        return image_label
 
 
 class TransformationVal(object):
@@ -79,20 +79,8 @@ class TransformationVal(object):
             t.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4)
         ])
 
-    def __call__(self, im_lb):
-        return self.trans_func(im_lb)
-
-
-class TransformationInference(object):
-
-    def __init__(self, crop_size):
-        self.trans_func = t.Compose([
-            t.ImageRandomResizeAndCrop(size=crop_size, is_random=False),
-            t.ImageColorJitter(brightness=0.4, contrast=0.4, saturation=0.4)
-        ])
-
-    def __call__(self, im_lb):
-        return self.trans_func(im_lb)
+    def __call__(self, image_label):
+        return self.trans_func(image_label)
 
 
 def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_iter=None, mode='train', distributed=True):
@@ -125,13 +113,3 @@ def get_data_loader(data_path, ann_path, ims_per_gpu, scales, crop_size, max_ite
         dl_ = DataLoader(ds_, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=NUM_WORKERS,
                          pin_memory=True)
     return dl_
-
-
-if __name__ == "__main__":
-    ds = TevelDataset(data_root='./data/', ann_path='./data/val.txt', mode='val')
-    dl = DataLoader(ds, batch_size=2, shuffle=True, num_workers=NUM_WORKERS, drop_last=True)
-    for images, label in dl:
-        print(len(images))
-        for el in images:
-            print(el.size())
-        break

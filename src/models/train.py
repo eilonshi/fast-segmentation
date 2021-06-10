@@ -7,7 +7,6 @@ import numpy as np
 from tabulate import tabulate
 
 import torch
-import torch.nn as nn
 import torch.distributed as dist
 import torch.cuda.amp as amp
 from torch.utils.tensorboard import SummaryWriter
@@ -15,10 +14,8 @@ from torch.backends import cudnn
 
 from evaluate import eval_model
 from src.configs import cfg_factory
-from src.models.consts import NUM_CLASSES
-from src.models.utils import get_next_dir_name, get_next_file_name
+from src.models.utils import get_next_dir_name, get_next_file_name, get_model
 from src.lib.soft_dice_loss import SoftDiceLoss
-from src.lib.architectures import model_factory
 from src.lib.tevel_cv2 import get_data_loader
 from src.lib.lr_scheduler import WarmupPolyLrScheduler
 from src.lib.meters import TimeMeter, AvgMeter
@@ -45,24 +42,6 @@ def parse_args():
 
 args = parse_args()
 cfg = cfg_factory[args.model]
-
-
-def get_model(model_type, num_classes=NUM_CLASSES, is_distributed=True):
-    net = model_factory[model_type](num_classes)
-
-    if args.finetune_from is not None:
-        net.load_state_dict(torch.load(args.finetune_from))
-    if cfg.use_sync_bn:
-        net = nn.SyncBatchNorm.convert_sync_batchnorm(net)
-
-    net.cuda()  # Moves all model parameters and buffers to the GPU
-    net.train()  # Sets the module in training mode
-
-    if is_distributed:
-        local_rank = dist.get_rank()
-        net = nn.parallel.DistributedDataParallel(net, device_ids=[local_rank, ], output_device=local_rank)
-
-    return net
 
 
 def get_losses():
@@ -157,7 +136,8 @@ def train():
     # set all components
     data_loader = get_data_loader(cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
                                   cfg.max_iter, mode='train', distributed=is_dist)
-    net = get_model(cfg.model_type, is_distributed=is_dist)
+    net = get_model(cfg.model_type, is_train=True, is_distributed=is_dist, model_to_load=args.finetune_from,
+                    use_sync_bn=cfg.use_sync_bn)
     criteria_pre, criteria_aux = get_losses()
     optimizer = set_optimizer(net)
     scaler = amp.GradScaler()  # mixed precision training

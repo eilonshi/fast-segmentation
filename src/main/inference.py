@@ -5,10 +5,10 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from src.lib.tevel_cv2 import TransformationVal
+from src.model_components.tevel_cv2 import TransformationVal
 from src.configs import cfg_factory
-from src.lib.transform_cv2 import ToTensor
-from src.models.utils import get_model
+from src.model_components.transform_cv2 import ToTensor
+from src.main.utils import get_model
 from src.visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
@@ -20,7 +20,7 @@ def parse_args():
     parse.add_argument('--weight-path', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth')
     parse.add_argument('--demo-path', dest='demo_path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/demo_results')
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/inference_results')
 
     return parse.parse_args()
 

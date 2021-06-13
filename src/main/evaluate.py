@@ -14,10 +14,10 @@ import torch.nn.functional as f
 import torch.distributed as dist
 
 from src.configs import cfg_factory
-from src.lib.architectures import model_factory
-from src.lib.logger import setup_logger
-from src.lib.tevel_cv2 import get_data_loader
-from src.models.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
+from src.model_components.architectures import model_factory
+from src.model_components.logger import setup_logger
+from src.model_components.tevel_cv2 import get_data_loader
+from src.main.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
 from src.visualization.visualize import save_labels_mask_with_legend
 
 

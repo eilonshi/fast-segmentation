@@ -14,12 +14,12 @@ from torch.backends import cudnn
 
 from evaluate import eval_model
 from src.configs import cfg_factory
-from src.models.utils import get_next_dir_name, get_next_file_name, get_model
-from src.lib.soft_dice_loss import SoftDiceLoss
-from src.lib.tevel_cv2 import get_data_loader
-from src.lib.lr_scheduler import WarmupPolyLrScheduler
-from src.lib.meters import TimeMeter, AvgMeter
-from src.lib.logger import setup_logger, print_log_msg
+from src.main.utils import get_next_dir_name, get_next_file_name, get_model
+from src.model_components.soft_dice_loss import SoftDiceLoss
+from src.model_components.tevel_cv2 import get_data_loader
+from src.model_components.lr_scheduler import WarmupPolyLrScheduler
+from src.model_components.meters import TimeMeter, AvgMeter
+from src.model_components.logger import setup_logger, print_log_msg
 
 # fix all random seeds
 torch.manual_seed(123)

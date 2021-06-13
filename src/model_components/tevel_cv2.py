@@ -4,11 +4,11 @@ import cv2
 import torch
 import torch.distributed as dist
 from torch.utils.data import Dataset, DataLoader
-from src.lib import transform_cv2 as t
+from src.model_components import transform_cv2 as t
 
-from src.lib.sampler import RepeatedDistSampler
-from src.lib.transform_cv2 import ToTensor
-from src.models.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
+from src.model_components.sampler import RepeatedDistSampler
+from src.model_components.transform_cv2 import ToTensor
+from src.main.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
 
 
 class TevelDataset(Dataset):

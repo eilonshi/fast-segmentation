@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import torch
 
-from src.lib.consts import MEAN, STD
+from src.model_components.consts import MEAN, STD
 
 
 class RandomResizedCrop(object):

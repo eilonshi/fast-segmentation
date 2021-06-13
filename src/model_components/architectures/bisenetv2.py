@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from src.models.consts import NUM_CLASSES
+from src.main.consts import NUM_CLASSES
 
 
 class ConvBNReLU(nn.Module):

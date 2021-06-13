@@ -4,8 +4,8 @@ import torch
 from torch import nn
 import torch.distributed as dist
 
-from src.lib.architectures import model_factory
-from src.models.consts import NUM_CLASSES
+from src.model_components.architectures import model_factory
+from src.main.consts import NUM_CLASSES
 
 
 def get_next_dir_name(root_dir):

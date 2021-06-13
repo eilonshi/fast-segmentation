@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 
-from src.models.consts import LABEL_TO_COLOR, IGNORE_LABEL, OTHER_LABEL
+from src.main.consts import LABEL_TO_COLOR, IGNORE_LABEL, OTHER_LABEL
 
 
 def labels_mask_to_colored_image(mask):

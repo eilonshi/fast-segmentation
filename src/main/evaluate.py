@@ -3,16 +3,14 @@ import os.path as osp
 import logging
 import argparse
 import math
-
 from tabulate import tabulate
-
 from tqdm import tqdm
+from typing import Tuple, List
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
 import torch.distributed as dist
-from typing import Tuple, List
 
 from src.configs import cfg_factory
 from src.model_components.architectures import model_factory
@@ -22,11 +20,17 @@ from src.main.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
 
 
 def parse_args():
+    """
+    Creates the parser for evaluation arguments
+
+    Returns:
+        The parser
+    """
     parse = argparse.ArgumentParser()
     parse.add_argument('--local_rank', dest='local_rank',
-                       type=int, default=-1, )
+                       type=int, default=-1)
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth', )
+                       default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
     parse.add_argument('--val_im_anns', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/data/train_small.txt')
@@ -35,7 +39,8 @@ def parse_args():
     parse.add_argument('--log_path', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/logs/regular_logs')
     parse.add_argument('--port', dest='port', type=int, default=44553, )
-    parse.add_argument('--model', dest='model', type=str, default='bisenetv2', )
+    parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
+
     return parse.parse_args()
 
 

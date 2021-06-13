@@ -15,6 +15,12 @@ torch.set_grad_enabled(False)
 
 
 def parse_args():
+    """
+    Creates the parser for inference arguments
+
+    Returns:
+        The parser
+    """
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
@@ -26,10 +32,6 @@ def parse_args():
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
 
     return parse.parse_args()
-
-
-args = parse_args()
-cfg = cfg_factory[args.model]
 
 
 def read_image_and_label(demo_im_anns, im_root):
@@ -84,5 +86,8 @@ def inference(image, model, label=None):
 
 
 if __name__ == '__main__':
+    args = parse_args()
+    cfg = cfg_factory[args.model]
+
     image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)
     inference(image=image_original, label=label_original, model=args.model)

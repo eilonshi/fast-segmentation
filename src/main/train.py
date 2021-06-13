@@ -16,7 +16,7 @@ import torch.nn as nn
 
 from evaluate import eval_model
 from src.configs import cfg_factory
-from src.main.utils import get_next_dir_name, get_next_file_name, get_model
+from src.main.utils import get_next_dir_name, get_next_file_name, build_model
 from src.model_components.soft_dice_loss import SoftDiceLoss
 from src.model_components.tevel_cv2 import get_data_loader
 from src.model_components.lr_scheduler import WarmupPolyLrScheduler
@@ -159,8 +159,8 @@ def train():
     # set all components
     data_loader = get_data_loader(args.im_root, args.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
                                   cfg.max_iter, mode='train', distributed=is_dist)
-    net = get_model(args.model, is_train=True, is_distributed=is_dist, model_to_load=args.finetune_from,
-                    use_sync_bn=cfg.use_sync_bn)
+    net = build_model(args.model, is_train=True, is_distributed=is_dist, pretrained_model_path=args.finetune_from,
+                      use_sync_bn=cfg.use_sync_bn)
     criteria_pre, criteria_aux = get_losses()
     optimizer = get_optimizer(net)
     scaler = amp.GradScaler()  # mixed precision training

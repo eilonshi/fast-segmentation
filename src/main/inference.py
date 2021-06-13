@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from src.model_components.tevel_cv2 import TransformationVal
 from src.configs import cfg_factory
 from src.model_components.transform_cv2 import ToTensor
-from src.main.utils import get_model
+from src.main.utils import build_model
 from src.visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
@@ -67,8 +67,8 @@ def preprocess_image(image):
 
 
 def inference(image, model, label=None):
-    net = get_model(model_type=model, is_distributed=False, model_to_load=args.weight_path, is_train=False,
-                    use_sync_bn=False)
+    net = build_model(model_type=model, is_distributed=False, pretrained_model_path=args.weight_path, is_train=False,
+                      use_sync_bn=False)
 
     image_tensor = preprocess_image(image)
 

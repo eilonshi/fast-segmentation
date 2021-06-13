@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 import torch.distributed as dist
-from typing import Tuple
+from typing import Tuple, List
 
 from src.configs import cfg_factory
 from src.model_components.architectures import model_factory
@@ -120,6 +120,7 @@ class MscEvalCrop(object):
         hst, hed = margin_h // 2, margin_h // 2 + h
         wst, wed = margin_w // 2, margin_w // 2 + w
         out_tensor[:, :, hst:hed, wst:wed] = in_tensor
+
         return out_tensor, [hst, hed, wst, wed]
 
     def eval_chip(self, net, crop):
@@ -128,6 +129,7 @@ class MscEvalCrop(object):
             crop = torch.flip(crop, dims=(3,))
             prob += net(crop)[0].flip(dims=(3,)).softmax(dim=1)
             prob = torch.exp(prob)
+
         return prob
 
     def crop_eval(self, net, im, n_classes):
@@ -142,6 +144,7 @@ class MscEvalCrop(object):
         n_w = math.ceil((w - crop_w) / stride_w) + 1
         prob = torch.zeros(n, n_classes, h, w).cuda()
         prob.requires_grad_(False)
+
         for i in range(n_h):
             for j in range(n_w):
                 st_h, st_w = stride_h * i, stride_w * j
@@ -151,6 +154,7 @@ class MscEvalCrop(object):
                 prob[:, :, st_h:end_h, st_w:end_w] += self.eval_chip(net, chip)
         hst, hed, wst, wed = indices
         prob = prob[:, :, hst:hed, wst:wed]
+
         return prob
 
     def scale_crop_eval(self, net, im, scale, n_classes):
@@ -159,6 +163,7 @@ class MscEvalCrop(object):
         im = f.interpolate(im, new_hw, mode='bilinear', align_corners=True)
         prob = self.crop_eval(net, im, n_classes)
         prob = f.interpolate(prob, (h, w), mode='bilinear', align_corners=True)
+
         return prob
 
     @torch.no_grad()
@@ -221,7 +226,7 @@ def save_in_false_analysis(images: torch.Tensor, path: str):
 
 @torch.no_grad()
 def eval_model(net: nn.Module, ims_per_gpu: int, scales: Tuple[int], crop_size: Tuple[int], im_root: str, im_anns: str,
-               false_analysis_path: str):
+               false_analysis_path: str) -> Tuple[List[str], List[float]]:
     is_dist = dist.is_initialized()
     dl = get_data_loader(im_root, im_anns, ims_per_gpu, scales, crop_size, mode='val', distributed=is_dist)
     net.eval()

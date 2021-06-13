@@ -39,6 +39,7 @@ def parse_args() -> argparse.Namespace:
         The parser
     """
     parse = argparse.ArgumentParser()
+
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=0)
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
@@ -60,18 +61,15 @@ def parse_args() -> argparse.Namespace:
     return parse.parse_args()
 
 
-args = parse_args()
-cfg = cfg_factory[args.model]
-
-
-def get_losses() -> Tuple[nn.Module, List[nn.Module]]:
-    criteria_pre = SoftDiceLoss()
-    criteria_aux = [SoftDiceLoss() for _ in range(cfg.num_aux_heads)]
-
-    return criteria_pre, criteria_aux
-
-
 def get_optimizer(model: nn.Module) -> torch.optim.Optimizer:
+    """
+    Builds the optimizer for the given pytorch model
+    Args:
+        model: a pytorch nn model
+
+    Returns:
+        an Adam optimizer for the given model
+    """
     wd_params, non_wd_params = [], []
 
     for name, param in model.named_parameters():
@@ -90,6 +88,11 @@ def get_optimizer(model: nn.Module) -> torch.optim.Optimizer:
 
 
 def get_meters() -> Tuple[TimeMeter, AvgMeter, AvgMeter, List[AvgMeter]]:
+    """
+
+    Returns:
+
+    """
     time_meter = TimeMeter(cfg.max_iter)
     loss_meter = AvgMeter('loss')
     loss_pre_meter = AvgMeter('loss_prem')
@@ -98,20 +101,24 @@ def get_meters() -> Tuple[TimeMeter, AvgMeter, AvgMeter, List[AvgMeter]]:
     return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
 
 
-def log_ious(writer, mious, iteration, heads, logger, mode):
+def log_ious(writer: SummaryWriter, mious: List[float], iteration: int, headers: List[str], logger: logging.Logger,
+             mode: str):
     single_scale_miou, single_scale_crop_miou, ms_flip_miou, ms_flip_crop_miou = mious
+
     writer.add_scalar(f"mIOU/{mode}/single_scale", single_scale_miou, iteration)
     writer.add_scalar(f"mIOU/{mode}/single_scale_crop", single_scale_crop_miou, iteration)
     writer.add_scalar(f"mIOU/{mode}/multi_scale_flip", ms_flip_miou, iteration)
     writer.add_scalar(f"mIOU/{mode}/multi_scale_flip_crop", ms_flip_crop_miou, iteration)
-    logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
+
+    logger.info(tabulate([mious, ], headers=headers, tablefmt='orgtbl'))
 
 
-def save_best_model(mious_val, best_score, models_dir, net):
-    if mious_val[0] > best_score:
-        best_score = mious_val[0]
+def save_best_model(cur_score: float, best_score: float, models_dir: str, net: nn.Module):
+    if cur_score > best_score:
+        best_score = cur_score
         save_pth = os.path.join(models_dir, f"best_model.pth")
         state = net.module.state_dict()
+
         if dist.get_rank() == 0:
             torch.save(state, save_pth)
 
@@ -125,6 +132,7 @@ def save_checkpoint(models_dir: str, logger: logging.Logger, net: nn.Module, wri
 
     logger.info('\nsave models to {}'.format(log_pth))
     state = net.module.state_dict()
+
     if dist.get_rank() == 0:
         torch.save(state, save_pth)
 
@@ -144,7 +152,7 @@ def save_checkpoint(models_dir: str, logger: logging.Logger, net: nn.Module, wri
     log_ious(writer, mious_train, iteration, heads_train, logger, mode='train')
 
     # save best model
-    best_score = save_best_model(mious_val, best_score, models_dir, net)
+    best_score = save_best_model(mious_val[0], best_score, models_dir, net)
 
     return best_score
 
@@ -161,7 +169,8 @@ def train():
                                   cfg.max_iter, mode='train', distributed=is_dist)
     net = build_model(args.model, is_train=True, is_distributed=is_dist, pretrained_model_path=args.finetune_from,
                       use_sync_bn=cfg.use_sync_bn)
-    criteria_pre, criteria_aux = get_losses()
+    criteria_pre = SoftDiceLoss()
+    criteria_aux = [SoftDiceLoss() for _ in range(cfg.num_aux_heads)]
     optimizer = get_optimizer(net)
     scaler = amp.GradScaler()  # mixed precision training
     time_meter, loss_meter, loss_pre_meter, loss_aux_meters = get_meters()  # metrics
@@ -215,6 +224,10 @@ def train():
 
 
 if __name__ == "__main__":
+
+    args = parse_args()
+    cfg = cfg_factory[args.model]
+
     torch.cuda.empty_cache()
     torch.cuda.set_device(args.local_rank)
     dist.init_process_group(

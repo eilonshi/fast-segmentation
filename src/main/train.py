@@ -11,6 +11,8 @@ import torch.distributed as dist
 import torch.cuda.amp as amp
 from torch.utils.tensorboard import SummaryWriter
 from torch.backends import cudnn
+from typing import Tuple, List
+import torch.nn as nn
 
 from evaluate import eval_model
 from src.configs import cfg_factory
@@ -29,12 +31,30 @@ random.seed(123)
 torch.backends.cudnn.deterministic = True
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
+    """
+    Creates the parser for train arguments
+
+    Returns:
+        The parser
+    """
     parse = argparse.ArgumentParser()
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=0)
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--finetune-from', type=str, default='../../models/3/best_model.pth')
+    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
+    parse.add_argument('--train_im_anns', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/train.txt')
+    parse.add_argument('--val_im_anns', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/train_small.txt')
+    parse.add_argument('--log_path', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/logs/regular_logs')
+    parse.add_argument('--false_analysis_path', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/false_analysis')
+    parse.add_argument('--tensorboard_path', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
+    parse.add_argument('--models_path', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/models')
     parse.add_argument('--amp', type=bool, default=True)
 
     return parse.parse_args()
@@ -44,14 +64,14 @@ args = parse_args()
 cfg = cfg_factory[args.model]
 
 
-def get_losses():
+def get_losses() -> Tuple[nn.Module, List[nn.Module]]:
     criteria_pre = SoftDiceLoss()
     criteria_aux = [SoftDiceLoss() for _ in range(cfg.num_aux_heads)]
 
     return criteria_pre, criteria_aux
 
 
-def get_optimizer(model):
+def get_optimizer(model: nn.Module) -> torch.optim.Optimizer:
     wd_params, non_wd_params = [], []
 
     for name, param in model.named_parameters():
@@ -69,7 +89,7 @@ def get_optimizer(model):
     return optimizer
 
 
-def get_meters():
+def get_meters() -> Tuple[TimeMeter, AvgMeter, AvgMeter, List[AvgMeter]]:
     time_meter = TimeMeter(cfg.max_iter)
     loss_meter = AvgMeter('loss')
     loss_pre_meter = AvgMeter('loss_prem')
@@ -98,8 +118,9 @@ def save_best_model(mious_val, best_score, models_dir, net):
     return best_score
 
 
-def save_checkpoint(models_dir, logger, net, writer, iteration, best_score):
-    log_pth = get_next_file_name(cfg.log_path, prefix='model_final_', suffix='.pth')
+def save_checkpoint(models_dir: str, logger: logging.Logger, net: nn.Module, writer: SummaryWriter, iteration: int,
+                    best_score: float):
+    log_pth = get_next_file_name(args.log_path, prefix='model_final_', suffix='.pth')
     save_pth = get_next_file_name(models_dir, prefix='model_final_', suffix='.pth')
 
     logger.info('\nsave models to {}'.format(log_pth))
@@ -111,13 +132,15 @@ def save_checkpoint(models_dir, logger, net, writer, iteration, best_score):
     torch.cuda.empty_cache()
 
     # evaluate val set
-    heads_val, mious_val = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
-                                      im_anns=cfg.val_im_anns)
+    heads_val, mious_val = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=args.im_root,
+                                      im_anns=args.val_im_anns, scales=cfg.scales, crop_size=cfg.crop_size,
+                                      false_analysis_path=args.false_analysis_path)
     log_ious(writer, mious_val, iteration, heads_val, logger, mode='val')
 
     # evaluate train set
-    heads_train, mious_train = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=cfg.im_root,
-                                          im_anns=cfg.train_im_anns)
+    heads_train, mious_train = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=args.im_root,
+                                          im_anns=args.train_im_anns, scales=cfg.scales, crop_size=cfg.crop_size,
+                                          false_analysis_path=args.false_analysis_path)
     log_ious(writer, mious_train, iteration, heads_train, logger, mode='train')
 
     # save best model
@@ -128,15 +151,15 @@ def save_checkpoint(models_dir, logger, net, writer, iteration, best_score):
 
 def train():
     logger = logging.getLogger()
-    tensorboard_log_dir = get_next_dir_name(root_dir=cfg.tensorboard_path)
-    models_dir = get_next_dir_name(root_dir=cfg.models_path)
+    tensorboard_log_dir = get_next_dir_name(root_dir=args.tensorboard_path)
+    models_dir = get_next_dir_name(root_dir=args.models_path)
     writer = SummaryWriter(log_dir=tensorboard_log_dir)
     is_dist = dist.is_initialized()
 
     # set all components
-    data_loader = get_data_loader(cfg.im_root, cfg.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
+    data_loader = get_data_loader(args.im_root, args.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
                                   cfg.max_iter, mode='train', distributed=is_dist)
-    net = get_model(cfg.model_type, is_train=True, is_distributed=is_dist, model_to_load=args.finetune_from,
+    net = get_model(args.model, is_train=True, is_distributed=is_dist, model_to_load=args.finetune_from,
                     use_sync_bn=cfg.use_sync_bn)
     criteria_pre, criteria_aux = get_losses()
     optimizer = get_optimizer(net)
@@ -201,8 +224,9 @@ if __name__ == "__main__":
         rank=args.local_rank
     )
 
-    if not osp.exists(cfg.log_path):
+    if not osp.exists(args.log_path):
         os.makedirs(cfg.log_path)
 
-    setup_logger('{}-train'.format(cfg.model_type), cfg.log_path)
+    setup_logger('{}-train'.format(args.model), args.log_path)
+
     train()

@@ -23,7 +23,7 @@ def save_image_with_legends_and_labels(save_path, image, legends, labels):
     plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
 
 
-def save_labels_mask_with_legend(mask, save_path):
+def save_labels_mask_with_legend(mask: np.ndarray, save_path: str):
     mask[mask == IGNORE_LABEL] = OTHER_LABEL
     image = labels_mask_to_colored_image(mask)
     labels = list(LABEL_TO_COLOR.keys())

@@ -16,11 +16,14 @@ torch.set_grad_enabled(False)
 
 def parse_args():
     parse = argparse.ArgumentParser()
-    parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
+    parse.add_argument('--model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth')
-    parse.add_argument('--demo-path', dest='demo_path', type=str,
+    parse.add_argument('--demo-path', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/data/inference_results')
+    parse.add_argument('--demo_im_anns', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/demo.txt')
+    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
 
     return parse.parse_args()
 
@@ -29,13 +32,13 @@ args = parse_args()
 cfg = cfg_factory[args.model]
 
 
-def read_image_and_label():
-    with open(cfg.demo_im_anns) as ann_file:
+def read_image_and_label(demo_im_anns, im_root):
+    with open(demo_im_anns) as ann_file:
         first_line = ann_file.readline()
     img_and_label = str.split(first_line, ',')
 
-    image_path = os.path.join(cfg.im_root, img_and_label[0]).rstrip()
-    label_path = os.path.join(cfg.im_root, img_and_label[1]).rstrip()
+    image_path = os.path.join(im_root, img_and_label[0]).rstrip()
+    label_path = os.path.join(im_root, img_and_label[1]).rstrip()
 
     image = np.asarray(cv2.imread(image_path))
     label = np.asarray(cv2.imread(label_path, 0))
@@ -63,8 +66,8 @@ def preprocess_image(image):
     return image_tensor
 
 
-def inference(image, label=None):
-    net = get_model(model_type=cfg.model_type, is_distributed=False, model_to_load=args.weight_path, is_train=False,
+def inference(image, model, label=None):
+    net = get_model(model_type=model, is_distributed=False, model_to_load=args.weight_path, is_train=False,
                     use_sync_bn=False)
 
     image_tensor = preprocess_image(image)
@@ -81,5 +84,5 @@ def inference(image, label=None):
 
 
 if __name__ == '__main__':
-    image_original, label_original = read_image_and_label()
-    inference(image_original, label_original)
+    image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)
+    inference(image=image_original, label=label_original, model=args.model)

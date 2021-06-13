@@ -12,13 +12,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as f
 import torch.distributed as dist
+from typing import Tuple
 
 from src.configs import cfg_factory
 from src.model_components.architectures import model_factory
 from src.model_components.logger import setup_logger
 from src.model_components.tevel_cv2 import get_data_loader
 from src.main.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
-from src.visualization.visualize import save_labels_mask_with_legend
 
 
 def parse_args():
@@ -27,13 +27,16 @@ def parse_args():
                        type=int, default=-1, )
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
                        default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth', )
+    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
+    parse.add_argument('--val_im_anns', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/train_small.txt')
+    parse.add_argument('--false_analysis_path', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/data/false_analysis')
+    parse.add_argument('--log_path', type=str,
+                       default='/home/bina/PycharmProjects/tevel-segmentation/logs/regular_logs')
     parse.add_argument('--port', dest='port', type=int, default=44553, )
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2', )
     return parse.parse_args()
-
-
-args = parse_args()
-cfg = cfg_factory[args.model]
 
 
 class MscEvalV0(object):
@@ -92,7 +95,8 @@ class MscEvalV0(object):
 
 class MscEvalCrop(object):
 
-    def __init__(self, crop_size, crop_stride, flip=True, scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75), label_ignore=255):
+    def __init__(self, crop_size, crop_stride, false_analysis_path, flip=True, scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75),
+                 label_ignore=255):
 
         self.scales = scales
         self.ignore_label = label_ignore
@@ -101,6 +105,8 @@ class MscEvalCrop(object):
 
         self.crop_size = crop_size if isinstance(crop_size, (list, tuple)) else (crop_size, crop_size)
         self.crop_stride = crop_stride
+
+        self.false_analysis_path = false_analysis_path
 
     def pad_tensor(self, in_tensor):
         n, c, h, w = in_tensor.size()
@@ -186,7 +192,7 @@ class MscEvalCrop(object):
             cur_miou = cur_miou.mean()
 
             if cur_miou < BAD_IOU:
-                save_in_false_analysis(imgs, cfg.false_analysis_path)
+                save_in_false_analysis(imgs, self.false_analysis_path)
 
             hist += bin_count
 
@@ -200,19 +206,24 @@ class MscEvalCrop(object):
         return miou.item()
 
 
-def save_in_false_analysis(images, path):
-    images_channels_last = images.permute([0, 2, 3, 1])
+def save_in_false_analysis(images: torch.Tensor, path: str):
+    # TODO: write again this function
+    pass
 
-    for i, image in enumerate(images_channels_last):
-        image = image.detach().cpu().numpy()
-        file_name = os.path.join(path, f'img{i}.jpg')
-        save_labels_mask_with_legend(mask=image, save_path=file_name)
+    # images_channels_last = images.permute([0, 2, 3, 1])
+    #
+    # for i, image in enumerate(images_channels_last):
+    #     image = image.detach().cpu().numpy()
+    #     file_name = os.path.join(path, f'img{i}.jpg')
+    #     print('filename', file_name)
+    #     save_labels_mask_with_legend(mask=image, save_path=file_name)
 
 
 @torch.no_grad()
-def eval_model(net, ims_per_gpu, im_root, im_anns):
+def eval_model(net: nn.Module, ims_per_gpu: int, scales: Tuple[int], crop_size: Tuple[int], im_root: str, im_anns: str,
+               false_analysis_path: str):
     is_dist = dist.is_initialized()
-    dl = get_data_loader(im_root, im_anns, ims_per_gpu, cfg.scales, cfg.crop_size, mode='val', distributed=is_dist)
+    dl = get_data_loader(im_root, im_anns, ims_per_gpu, scales, crop_size, mode='val', distributed=is_dist)
     net.eval()
 
     heads, mious = [], []
@@ -224,8 +235,8 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     mious.append(miou)
     logger.info('single mIOU is: %s\n', miou)
 
-    single_crop = MscEvalCrop(crop_size=cfg.crop_size, crop_stride=2. / 3, flip=False, scales=[1.],
-                              label_ignore=IGNORE_LABEL)
+    single_crop = MscEvalCrop(crop_size=crop_size, crop_stride=2. / 3, flip=False, scales=[1.],
+                              label_ignore=IGNORE_LABEL, false_analysis_path=false_analysis_path)
     miou = single_crop(net, dl, NUM_CLASSES)
     heads.append('single_scale_crop')
     mious.append(miou)
@@ -237,8 +248,9 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     mious.append(miou)
     logger.info('ms flip mIOU is: %s\n', miou)
 
-    ms_flip_crop = MscEvalCrop(crop_size=cfg.crop_size, crop_stride=2. / 3, flip=True,
-                               scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75], label_ignore=IGNORE_LABEL)
+    ms_flip_crop = MscEvalCrop(crop_size=crop_size, crop_stride=2. / 3, flip=True,
+                               scales=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75], label_ignore=IGNORE_LABEL,
+                               false_analysis_path=false_analysis_path)
     miou = ms_flip_crop(net, dl, NUM_CLASSES)
     heads.append('ms_flip_crop')
     mious.append(miou)
@@ -247,12 +259,12 @@ def eval_model(net, ims_per_gpu, im_root, im_anns):
     return heads, mious
 
 
-def evaluate(cfg_, weight_pth):
+def evaluate(cfg_, weight_pth, model_type, im_root, val_im_anns, false_analysis_path):
     logger = logging.getLogger()
 
     # model
     logger.info('setup and restore model')
-    net = model_factory[cfg_.model_type](NUM_CLASSES)
+    net = model_factory[model_type](NUM_CLASSES)
     net.load_state_dict(torch.load(weight_pth))
     net.cuda()
 
@@ -262,11 +274,15 @@ def evaluate(cfg_, weight_pth):
         net = nn.parallel.DistributedDataParallel(net, device_ids=[local_rank, ], output_device=local_rank)
 
     # evaluator
-    heads, mious = eval_model(net, cfg_.ims_per_gpu, cfg_.im_root, cfg_.val_im_anns)
+    heads, mious = eval_model(net=net, ims_per_gpu=cfg_.ims_per_gpu, im_root=im_root, im_anns=val_im_anns,
+                              false_analysis_path=false_analysis_path, scales=cfg_.scales, crop_size=cfg_.crop_size)
     logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
 
 
-def main():
+if __name__ == "__main__":
+    args = parse_args()
+    cfg = cfg_factory[args.model]
+
     if not args.local_rank == -1:
         torch.cuda.set_device(args.local_rank)
         dist.init_process_group(backend='nccl',
@@ -274,11 +290,8 @@ def main():
                                 world_size=torch.cuda.device_count(),
                                 rank=args.local_rank
                                 )
-    if not osp.exists(cfg.log_path):
-        os.makedirs(cfg.log_path)
-    setup_logger('{}-eval'.format(cfg.model_type), cfg.log_path)
-    evaluate(cfg, args.weight_pth)
-
-
-if __name__ == "__main__":
-    main()
+    if not osp.exists(args.log_path):
+        os.makedirs(args.log_path)
+    setup_logger('{}-eval'.format(args.model), args.log_path)
+    evaluate(cfg, args.weight_pth, model_type=args.model, im_root=args.im_root, val_im_anns=args.val_im_anns,
+             false_analysis_path=args.false_analysis_path)

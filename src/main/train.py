@@ -89,9 +89,10 @@ def get_optimizer(model: nn.Module) -> torch.optim.Optimizer:
 
 def get_meters() -> Tuple[TimeMeter, AvgMeter, AvgMeter, List[AvgMeter]]:
     """
+    Creates the meters of the time and the loss
 
     Returns:
-
+        tuple of - (time meter, loss meter, main loss meter, auxiliary loss meter)
     """
     time_meter = TimeMeter(cfg.max_iter)
     loss_meter = AvgMeter('loss')
@@ -113,7 +114,19 @@ def log_ious(writer: SummaryWriter, mious: List[float], iteration: int, headers:
     logger.info(tabulate([mious, ], headers=headers, tablefmt='orgtbl'))
 
 
-def save_best_model(cur_score: float, best_score: float, models_dir: str, net: nn.Module):
+def save_best_model(cur_score: float, best_score: float, models_dir: str, net: nn.Module) -> float:
+    """
+    Saves the model if it is better than the last best model, and returns the score of the current best model
+
+    Args:
+        cur_score: the score of the current model
+        best_score: the score of the last best model
+        models_dir: the path of the directory of the model weights to save the weights of the best model
+        net: the current pytorch model
+
+    Returns:
+        the best score
+    """
     if cur_score > best_score:
         best_score = cur_score
         save_pth = os.path.join(models_dir, f"best_model.pth")
@@ -125,18 +138,25 @@ def save_best_model(cur_score: float, best_score: float, models_dir: str, net: n
     return best_score
 
 
-def save_checkpoint(models_dir: str, logger: logging.Logger, net: nn.Module, writer: SummaryWriter, iteration: int,
-                    best_score: float):
+def save_evaluation_log(models_dir: str, logger: logging.Logger, net: nn.Module, writer: SummaryWriter, iteration: int,
+                        best_score: float) -> float:
+    """
+    Saves a log with the SummaryWriter, and if the model is the best model until now, saves the model as the best model
+
+    Args:
+        models_dir: path to the directory to save the model in, in case it is the best model
+        logger: the logger that logs the evaluation log
+        net: the pytorch network
+        writer: the tensorboard summary writer
+        iteration: the index of the current iteration
+        best_score: the score of the best model until now
+
+    Returns:
+        the score of the best model
+    """
     log_pth = get_next_file_name(args.log_path, prefix='model_final_', suffix='.pth')
-    save_pth = get_next_file_name(models_dir, prefix='model_final_', suffix='.pth')
+    logger.info(f'\nevaluating the model \nsave models to {log_pth}')
 
-    logger.info('\nsave models to {}'.format(log_pth))
-    state = net.module.state_dict()
-
-    if dist.get_rank() == 0:
-        torch.save(state, save_pth)
-
-    logger.info('\nevaluating the model')
     torch.cuda.empty_cache()
 
     # evaluate val set
@@ -157,7 +177,31 @@ def save_checkpoint(models_dir: str, logger: logging.Logger, net: nn.Module, wri
     return best_score
 
 
+def save_checkpoint(models_dir: str, net: nn.Module):
+    """
+    Saves a checkpoint of the given network to the given directory
+
+    Args:
+        models_dir: the path to the directory to save the model in
+        net: a pytorch network
+
+    Returns:
+        None
+    """
+    save_pth = get_next_file_name(models_dir, prefix='model_final_', suffix='.pth')
+    state = net.module.state_dict()
+
+    if dist.get_rank() == 0:
+        torch.save(state, save_pth)
+
+
 def train():
+    """
+    The main function for training the semantic segmentation model
+
+    Returns:
+        None
+    """
     logger = logging.getLogger()
     tensorboard_log_dir = get_next_dir_name(root_dir=args.tensorboard_path)
     models_dir = get_next_dir_name(root_dir=args.models_path)
@@ -215,7 +259,8 @@ def train():
 
         # saving the model and evaluating it
         if (iteration + 1) % cfg.checkpoint_iters == 0:
-            best_score = save_checkpoint(models_dir, logger, net, writer, iteration, best_score)
+            best_score = save_evaluation_log(models_dir, logger, net, writer, iteration, best_score)
+            save_checkpoint(models_dir, net)
 
         lr_scheduler.step()
 

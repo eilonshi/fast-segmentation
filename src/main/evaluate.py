@@ -14,8 +14,8 @@ import torch.distributed as dist
 
 from src.configs import cfg_factory
 from src.model_components.architectures import model_factory
+from src.model_components.data_cv2 import get_data_loader
 from src.model_components.logger import setup_logger
-from src.model_components.tevel_cv2 import get_data_loader
 from src.main.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
 
 
@@ -30,14 +30,14 @@ def parse_args():
     parse.add_argument('--local_rank', dest='local_rank',
                        type=int, default=-1)
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth')
-    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/5/best_model.pth')
+    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--val_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/train_small.txt')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/train_small.txt')
     parse.add_argument('--false_analysis_path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/false_analysis')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/false_analysis')
     parse.add_argument('--log_path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/logs/regular_logs')
+                       default='/home/bina/PycharmProjects/fast-segmentation/logs/regular_logs')
     parse.add_argument('--port', dest='port', type=int, default=44553, )
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
 

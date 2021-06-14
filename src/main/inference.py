@@ -6,8 +6,8 @@ import cv2
 import matplotlib.pyplot as plt
 from typing import Tuple
 
-from src.model_components.tevel_cv2 import TransformationVal
 from src.configs import cfg_factory
+from src.model_components.data_cv2 import TransformationVal
 from src.model_components.transform_cv2 import ToTensor
 from src.main.utils import build_model
 from src.visualization.visualize import save_labels_mask_with_legend
@@ -25,12 +25,12 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/models/5/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/5/best_model.pth')
     parse.add_argument('--demo-path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/inference_results')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/inference_results')
     parse.add_argument('--demo_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/demo.txt')
-    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/demo.txt')
+    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
 
     return parse.parse_args()
 

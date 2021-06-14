@@ -17,8 +17,8 @@ import torch.nn as nn
 from evaluate import eval_model
 from src.configs import cfg_factory
 from src.main.utils import get_next_dir_name, get_next_file_name, build_model
+from src.model_components.data_cv2 import get_data_loader
 from src.model_components.soft_dice_loss import SoftDiceLoss
-from src.model_components.tevel_cv2 import get_data_loader
 from src.model_components.lr_scheduler import WarmupPolyLrScheduler
 from src.model_components.meters import TimeMeter, AvgMeter
 from src.model_components.logger import setup_logger, print_log_msg
@@ -44,18 +44,18 @@ def parse_args() -> argparse.Namespace:
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--finetune-from', type=str, default='../../models/3/best_model.pth')
-    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/data')
+    parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--train_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/train.txt')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/train.txt')
     parse.add_argument('--val_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/train_small.txt')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/train_small.txt')
     parse.add_argument('--log_path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/logs/regular_logs')
+                       default='/home/bina/PycharmProjects/fast-segmentation/logs/regular_logs')
     parse.add_argument('--false_analysis_path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/data/false_analysis')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/false_analysis')
     parse.add_argument('--tensorboard_path', type=str,
-                       default='/home/bina/PycharmProjects/tevel-segmentation/logs/tensorboard_logs')
-    parse.add_argument('--models_path', type=str, default='/home/bina/PycharmProjects/tevel-segmentation/models')
+                       default='/home/bina/PycharmProjects/fast-segmentation/logs/tensorboard_logs')
+    parse.add_argument('--models_path', type=str, default='/home/bina/PycharmProjects/fast-segmentation/models')
     parse.add_argument('--amp', type=bool, default=True)
 
     return parse.parse_args()
@@ -283,7 +283,7 @@ if __name__ == "__main__":
     )
 
     if not osp.exists(args.log_path):
-        os.makedirs(cfg.log_path)
+        os.makedirs(args.log_path)
 
     setup_logger('{}-train'.format(args.model), args.log_path)
 

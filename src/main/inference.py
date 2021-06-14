@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import cv2
 import matplotlib.pyplot as plt
+from typing import Tuple
 
 from src.model_components.tevel_cv2 import TransformationVal
 from src.configs import cfg_factory
@@ -34,9 +35,20 @@ def parse_args():
     return parse.parse_args()
 
 
-def read_image_and_label(demo_im_anns, im_root):
+def read_image_and_label(demo_im_anns: str, im_root: str) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Reads image and label according to the first line in the given directory
+
+    Args:
+        demo_im_anns: the relative path to the file from the root data directory
+        im_root: the root directory for the data
+
+    Returns:
+        image (rgb) and corresponding label (grayscale)
+    """
     with open(demo_im_anns) as ann_file:
         first_line = ann_file.readline()
+
     img_and_label = str.split(first_line, ',')
 
     image_path = os.path.join(im_root, img_and_label[0]).rstrip()
@@ -48,11 +60,29 @@ def read_image_and_label(demo_im_anns, im_root):
     return image, label
 
 
-def create_empty_label(image):
+def create_empty_label(image: np.ndarray) -> np.ndarray:
+    """
+    Creates an empty annotation mask according to the shape of the given image
+
+    Args:
+        image: an image with shape WxHxC (C is channels)
+
+    Returns:
+        black mask with the shape of (WxH) by the given image
+    """
     return np.zeros(image.shape[:2])
 
 
-def preprocess_image(image):
+def preprocess_image(image: np.ndarray) -> torch.Tensor:
+    """
+    Converts the given image to a pytorch tensor and makes some operations on it
+
+    Args:
+        image: rgb image with shape WxHxC
+
+    Returns:
+        pytorch tensor image with 4 dimensions (defined by the crop size)
+    """
     label = create_empty_label(image)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -68,9 +98,21 @@ def preprocess_image(image):
     return image_tensor
 
 
-def inference(image, model, label=None):
-    net = build_model(model_type=model, is_distributed=False, pretrained_model_path=args.weight_path, is_train=False,
-                      use_sync_bn=False)
+def inference(image: np.ndarray, model_type: str, label: np.ndarray = None):
+    """
+    The main function that responsible of applying the semantic segmentation model on the given image, the result is
+    saved to the corresponding paths
+
+    Args:
+        image: an image to run the segmentation model on
+        model_type: the name of the model architecture type
+        label: optional - an annotation mask to save next to the result
+
+    Returns:
+        None
+    """
+    net = build_model(model_type=model_type, is_distributed=False, pretrained_model_path=args.weight_path,
+                      is_train=False, use_sync_bn=False)
 
     image_tensor = preprocess_image(image)
 
@@ -90,4 +132,4 @@ if __name__ == '__main__':
     cfg = cfg_factory[args.model]
 
     image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)
-    inference(image=image_original, label=label_original, model=args.model)
+    inference(image=image_original, label=label_original, model_type=args.model)

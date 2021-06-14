@@ -45,6 +45,9 @@ def parse_args():
 
 
 class MscEvalV0(object):
+    """
+
+    """
 
     def __init__(self, scales=(0.5,), flip=False, ignore_label=IGNORE_LABEL):
         self.scales = scales
@@ -54,6 +57,7 @@ class MscEvalV0(object):
     def __call__(self, net, dl, n_classes):
         # evaluate
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
+
         if dist.is_initialized() and dist.get_rank() != 0:
             d_iter = enumerate(dl)
         else:
@@ -116,11 +120,14 @@ class MscEvalCrop(object):
     def pad_tensor(self, in_tensor):
         n, c, h, w = in_tensor.size()
         crop_h, crop_w = self.crop_size
+
         if crop_h < h and crop_w < w:
             return in_tensor, [0, h, 0, w]
+
         pad_h, pad_w = max(crop_h, h), max(crop_w, w)
         out_tensor = torch.zeros(n, c, pad_h, pad_w).cuda()
         out_tensor.requires_grad_(False)
+
         margin_h, margin_w = pad_h - h, pad_w - w
         hst, hed = margin_h // 2, margin_h // 2 + h
         wst, wed = margin_w // 2, margin_w // 2 + w
@@ -130,6 +137,7 @@ class MscEvalCrop(object):
 
     def eval_chip(self, net, crop):
         prob = net(crop)[0].softmax(dim=1)
+
         if self.flip:
             crop = torch.flip(crop, dims=(3,))
             prob += net(crop)[0].flip(dims=(3,)).softmax(dim=1)
@@ -157,6 +165,7 @@ class MscEvalCrop(object):
                 st_h, st_w = end_h - crop_h, end_w - crop_w
                 chip = im[:, :, st_h:end_h, st_w:end_w]
                 prob[:, :, st_h:end_h, st_w:end_w] += self.eval_chip(net, chip)
+
         hst, hed, wst, wed = indices
         prob = prob[:, :, hst:hed, wst:wed]
 
@@ -286,7 +295,7 @@ def evaluate(cfg_, weight_pth, model_type, im_root, val_im_anns, false_analysis_
     # evaluator
     heads, mious = eval_model(net=net, ims_per_gpu=cfg_.ims_per_gpu, im_root=im_root, im_anns=val_im_anns,
                               false_analysis_path=false_analysis_path, scales=cfg_.scales, crop_size=cfg_.crop_size)
-    logger.info(tabulate([mious, ], headers=heads, tablefmt='orgtbl'))
+    logger.info(tabulate([mious], headers=heads, tablefmt='orgtbl'))
 
 
 if __name__ == "__main__":
@@ -300,8 +309,11 @@ if __name__ == "__main__":
                                 world_size=torch.cuda.device_count(),
                                 rank=args.local_rank
                                 )
+
     if not osp.exists(args.log_path):
         os.makedirs(args.log_path)
+
     setup_logger('{}-eval'.format(args.model), args.log_path)
+
     evaluate(cfg, args.weight_pth, model_type=args.model, im_root=args.im_root, val_im_anns=args.val_im_anns,
              false_analysis_path=args.false_analysis_path)

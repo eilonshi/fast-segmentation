@@ -6,11 +6,10 @@ import torch.distributed as dist
 from torch.utils.data import Dataset, DataLoader
 from typing import Tuple
 
-from src.fast_segmentation.model_components import transform_cv2 as t
-
-from src.fast_segmentation.model_components.sampler import RepeatedDistSampler
-from src.fast_segmentation.model_components.transform_cv2 import ToTensor
-from src.fast_segmentation.main.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
+from fast_segmentation.model_components import transform_cv2 as t
+from fast_segmentation.model_components.sampler import RepeatedDistSampler
+from fast_segmentation.model_components.transform_cv2 import ToTensor
+from fast_segmentation.main.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
 
 
 class UrbanDataset(Dataset):

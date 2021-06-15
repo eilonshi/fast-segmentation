@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from typing import List, Tuple
 
-from src.fast_segmentation.main.consts import LABEL_TO_COLOR, IGNORE_LABEL, OTHER_LABEL, PIXELS_SCALE
+from fast_segmentation.main.consts import LABEL_TO_COLOR, IGNORE_LABEL, OTHER_LABEL, PIXELS_SCALE
 
 
 def labels_mask_to_colored_image(mask: np.ndarray) -> np.ndarray:

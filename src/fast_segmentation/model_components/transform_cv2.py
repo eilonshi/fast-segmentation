@@ -2,6 +2,7 @@ import math
 import numpy as np
 import cv2
 import torch
+from typing import Tuple
 
 from src.fast_segmentation.model_components.consts import MEAN, STD
 
@@ -11,7 +12,7 @@ class RandomResizedCrop(object):
     size should be a tuple of (H, W)
     """
 
-    def __init__(self, scales=(0.5, 1.), size=(384, 384), is_random=True):
+    def __init__(self, size: Tuple[int, int], scales: Tuple = (1.,), is_random: bool = True):
         self.scales = scales
         self.size = size
         self.is_random = is_random

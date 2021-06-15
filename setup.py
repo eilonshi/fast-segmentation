@@ -11,9 +11,10 @@ setuptools.setup(
     description="A package for fast segmentation algorithm",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pypa/fast-segmentation",
+    url="https://github.com/eilonshi/fast-segmentation",
+    download_url="https://github.com/eilonshi/fast-segmentation/archive/refs/tags/0.0.3.5.tar.gz",
     project_urls={
-        "Bug Tracker": "https://github.com/pypa/fast-segmentation/issues",
+        "Bug Tracker": "https://github.com/eilonshi/fast-segmentation/issues",
     },
     classifiers=[
         "Programming Language :: Python :: 3",

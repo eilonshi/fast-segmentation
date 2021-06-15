@@ -6,6 +6,8 @@ import cv2
 import matplotlib.pyplot as plt
 from typing import Tuple
 
+import yaml
+
 from src.fast_segmentation.configs import cfg_factory
 from src.fast_segmentation.model_components.data_cv2 import TransformationVal
 from src.fast_segmentation.model_components.transform_cv2 import ToTensor
@@ -73,11 +75,12 @@ def create_empty_label(image: np.ndarray) -> np.ndarray:
     return np.zeros(image.shape[:2])
 
 
-def preprocess_image(image: np.ndarray) -> torch.Tensor:
+def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Tensor:
     """
     Converts the given image to a pytorch tensor and makes some operations on it
 
     Args:
+        crop_size:
         image: rgb image with shape WxHxC
 
     Returns:
@@ -87,7 +90,7 @@ def preprocess_image(image: np.ndarray) -> torch.Tensor:
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     image_label = {'image': image_rgb, 'label': label}
-    image_label_cropped = TransformationVal(cfg.crop_size)(image_label)
+    image_label_cropped = TransformationVal(crop_size=crop_size)(image_label)
 
     image_tensor = ToTensor()(image_label_cropped)['image']
     image_tensor = torch.unsqueeze(image_tensor, 0)
@@ -98,12 +101,16 @@ def preprocess_image(image: np.ndarray) -> torch.Tensor:
     return image_tensor
 
 
-def inference(image: np.ndarray, model_type: str, label: np.ndarray = None):
+def inference(image: np.ndarray, model_type: str, weight_path: str, demo_path: str, crop_size: Tuple[int, int],
+              label: np.ndarray = None):
     """
     The main function that responsible of applying the semantic segmentation model on the given image, the result is
     saved to the corresponding paths
 
     Args:
+        crop_size:
+        weight_path:
+        demo_path:
         image: an image to run the segmentation model on
         model_type: the name of the model architecture type
         label: optional - an annotation mask to save next to the result
@@ -111,25 +118,28 @@ def inference(image: np.ndarray, model_type: str, label: np.ndarray = None):
     Returns:
         None
     """
-    net = build_model(model_type=model_type, is_distributed=False, pretrained_model_path=args.weight_path,
+    net = build_model(model_type=model_type, is_distributed=False, pretrained_model_path=weight_path,
                       is_train=False, use_sync_bn=False)
 
-    image_tensor = preprocess_image(image)
+    image_tensor = preprocess_image(image, crop_size=crop_size)
 
     # get output from logits
     logits, *logits_aux = net(image_tensor)
     out = logits[:1].argmax(dim=1).squeeze().detach().cpu().numpy()
 
     # save image, label and inference
-    plt.imsave(os.path.join(args.demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    save_labels_mask_with_legend(mask=out, save_path=os.path.join(args.demo_path, 'inf_result.jpg'))
+    plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
     if label is not None:
-        save_labels_mask_with_legend(mask=label, save_path=os.path.join(args.demo_path, 'inf_label.jpg'))
+        save_labels_mask_with_legend(mask=label, save_path=os.path.join(demo_path, 'inf_label.jpg'))
 
 
 if __name__ == '__main__':
     args = parse_args()
-    cfg = cfg_factory[args.model]
+
+    with open('/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml') as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)
-    inference(image=image_original, label=label_original, model_type=args.model)
+    inference(image=image_original, label=label_original, model_type=args.model, weight_path=args.weight_path,
+              demo_path=args.demo_path, crop_size=cfg['crop_size'])

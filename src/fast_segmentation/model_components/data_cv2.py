@@ -13,9 +13,9 @@ from src.fast_segmentation.model_components.transform_cv2 import ToTensor
 from src.fast_segmentation.main.consts import NUM_CLASSES, NUM_WORKERS, IGNORE_LABEL
 
 
-class TevelDataset(Dataset):
-    def __init__(self, data_root, ann_path, trans_func=None, mode='train'):
-        super(TevelDataset, self).__init__()
+class UrbanDataset(Dataset):
+    def __init__(self, data_root: str, ann_path: str, trans_func: callable = None, mode: str = 'train'):
+        super(UrbanDataset, self).__init__()
         assert mode in ('train', 'val')
 
         self.n_cats = NUM_CLASSES
@@ -60,9 +60,9 @@ class TevelDataset(Dataset):
 
 class TransformationTrain(object):
 
-    def __init__(self, scales, crop_size):
+    def __init__(self, scales: Tuple, crop_size: Tuple[int, int]):
         self.trans_func = t.Compose([
-            t.RandomResizedCrop(scales, crop_size),
+            t.RandomResizedCrop(scales=scales, size=crop_size),
             t.RandomHorizontalFlip(),
             t.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4)
         ])
@@ -85,22 +85,22 @@ class TransformationVal(object):
         return self.trans_func(image_label)
 
 
-def get_data_loader(data_path: str, ann_path: str, ims_per_gpu: int, crop_size: Tuple[int, int], scales: List = None,
+def get_data_loader(data_path: str, ann_path: str, ims_per_gpu: int, crop_size: Tuple[int, int], scales: Tuple = None,
                     max_iter: int = None, mode: str = 'train', distributed=True):
     if mode == 'train':
-        trans_func = TransformationTrain(scales, crop_size)
+        trans_func = TransformationTrain(scales=scales, crop_size=crop_size)
         batch_size = ims_per_gpu
         shuffle = True
         drop_last = True
     elif mode == 'val':
-        trans_func = TransformationVal(crop_size)
+        trans_func = TransformationVal(crop_size=crop_size)
         batch_size = ims_per_gpu
         shuffle = False
         drop_last = False
     else:
         raise ValueError
 
-    ds_ = TevelDataset(data_path, ann_path, trans_func=trans_func, mode=mode)
+    ds_ = UrbanDataset(data_path, ann_path, trans_func=trans_func, mode=mode)
 
     if distributed:
         assert dist.is_available(), "dist should be initialized"

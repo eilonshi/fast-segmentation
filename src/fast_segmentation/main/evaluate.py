@@ -3,16 +3,17 @@ import os.path as osp
 import logging
 import argparse
 import math
+
+import yaml
 from tabulate import tabulate
 from tqdm import tqdm
 from typing import Tuple, List
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as f
+import torch.nn.functional as functional
 import torch.distributed as dist
 
-from src.fast_segmentation.configs import cfg_factory
 from src.fast_segmentation.model_components.architectures import model_factory
 from src.fast_segmentation.model_components.data_cv2 import get_data_loader
 from src.fast_segmentation.model_components.logger import setup_logger
@@ -49,29 +50,29 @@ class MscEvalV0(object):
 
     """
 
-    def __init__(self, scales=(0.5,), flip=False, ignore_label=IGNORE_LABEL):
+    def __init__(self, scales=(1.,), flip=False, ignore_label=IGNORE_LABEL):
         self.scales = scales
         self.flip = flip
         self.ignore_label = ignore_label
 
-    def __call__(self, net, dl, n_classes):
+    def __call__(self, net: nn.Module, data_loader, num_classes):
         # evaluate
-        hist = torch.zeros(n_classes, n_classes).cuda().detach()
+        hist = torch.zeros(num_classes, num_classes).cuda().detach()
 
         if dist.is_initialized() and dist.get_rank() != 0:
-            d_iter = enumerate(dl)
+            d_iter = enumerate(data_loader)
         else:
-            d_iter = enumerate(tqdm(dl))
+            d_iter = enumerate(tqdm(data_loader))
 
         for i, (imgs, labels) in d_iter:
             n, _, h, w = labels.shape
             labels = labels.squeeze(1).cuda()
             size = labels.size()[-2:]
-            probs = torch.zeros((n, n_classes, h, w), dtype=torch.float32).cuda().detach()
+            probs = torch.zeros((n, num_classes, h, w), dtype=torch.float32).cuda().detach()
 
             for scale in self.scales:
                 s_h, s_w = int(scale * h), int(scale * w)
-                im_sc = f.interpolate(imgs, size=(s_h, s_w), mode='bilinear', align_corners=True)
+                im_sc = functional.interpolate(imgs, size=(s_h, s_w), mode='bilinear', align_corners=True)
 
                 im_sc = im_sc.cuda()
                 if self.flip:
@@ -82,14 +83,14 @@ class MscEvalV0(object):
                 if self.flip:
                     logits = torch.flip(logits, dims=(3,))
 
-                logits = f.interpolate(logits, size=size, mode='bilinear', align_corners=True)
+                logits = functional.interpolate(logits, size=size, mode='bilinear', align_corners=True)
                 probs += torch.softmax(logits, dim=1)
 
             # calc histogram of the predictions in each class
             preds = torch.argmax(probs, dim=1)
             relevant_labels = labels != self.ignore_label
-            hist += torch.bincount(labels[relevant_labels] * n_classes + preds[relevant_labels],
-                                   minlength=n_classes ** 2).view(n_classes, n_classes)
+            hist += torch.bincount(labels[relevant_labels] * num_classes + preds[relevant_labels],
+                                   minlength=num_classes ** 2).view(num_classes, num_classes)
 
         if dist.is_initialized():
             dist.all_reduce(hist, dist.ReduceOp.SUM)
@@ -174,9 +175,9 @@ class MscEvalCrop(object):
     def scale_crop_eval(self, net, im, scale, n_classes):
         n, c, h, w = im.size()
         new_hw = [int(h * scale), int(w * scale)]
-        im = f.interpolate(im, new_hw, mode='bilinear', align_corners=True)
+        im = functional.interpolate(im, new_hw, mode='bilinear', align_corners=True)
         prob = self.crop_eval(net, im, n_classes)
-        prob = f.interpolate(prob, (h, w), mode='bilinear', align_corners=True)
+        prob = functional.interpolate(prob, (h, w), mode='bilinear', align_corners=True)
 
         return prob
 
@@ -239,10 +240,11 @@ def save_in_false_analysis(images: torch.Tensor, path: str):
 
 
 @torch.no_grad()
-def eval_model(net: nn.Module, ims_per_gpu: int, scales: Tuple[int], crop_size: Tuple[int], im_root: str, im_anns: str,
+def eval_model(net: nn.Module, ims_per_gpu: int, crop_size: Tuple[int, int], im_root: str, im_anns: str,
                false_analysis_path: str) -> Tuple[List[str], List[float]]:
     is_dist = dist.is_initialized()
-    dl = get_data_loader(im_root, im_anns, ims_per_gpu, scales, crop_size, mode='val', distributed=is_dist)
+    dl = get_data_loader(data_path=im_root, ann_path=im_anns, ims_per_gpu=ims_per_gpu, crop_size=crop_size, mode='val',
+                         distributed=is_dist)
     net.eval()
 
     heads, mious = [], []
@@ -278,7 +280,7 @@ def eval_model(net: nn.Module, ims_per_gpu: int, scales: Tuple[int], crop_size: 
     return heads, mious
 
 
-def evaluate(cfg_, weight_pth, model_type, im_root, val_im_anns, false_analysis_path):
+def evaluate(ims_per_gpu, crop_size, weight_pth, model_type, im_root, val_im_anns, false_analysis_path):
     logger = logging.getLogger()
 
     # model
@@ -293,14 +295,16 @@ def evaluate(cfg_, weight_pth, model_type, im_root, val_im_anns, false_analysis_
         net = nn.parallel.DistributedDataParallel(net, device_ids=[local_rank, ], output_device=local_rank)
 
     # evaluator
-    heads, mious = eval_model(net=net, ims_per_gpu=cfg_.ims_per_gpu, im_root=im_root, im_anns=val_im_anns,
-                              false_analysis_path=false_analysis_path, scales=cfg_.scales, crop_size=cfg_.crop_size)
+    heads, mious = eval_model(net=net, ims_per_gpu=ims_per_gpu, im_root=im_root, im_anns=val_im_anns,
+                              false_analysis_path=false_analysis_path, crop_size=crop_size)
     logger.info(tabulate([mious], headers=heads, tablefmt='orgtbl'))
 
 
 if __name__ == "__main__":
     args = parse_args()
-    cfg = cfg_factory[args.model]
+
+    with open('/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml') as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     if not args.local_rank == -1:
         torch.cuda.set_device(args.local_rank)
@@ -315,5 +319,6 @@ if __name__ == "__main__":
 
     setup_logger('{}-eval'.format(args.model), args.log_path)
 
-    evaluate(cfg, args.weight_pth, model_type=args.model, im_root=args.im_root, val_im_anns=args.val_im_anns,
+    evaluate(ims_per_gpu=cfg['ims_per_gpu'], crop_size=cfg['crop_size'], weight_pth=args.weight_pth,
+             model_type=args.model, im_root=args.im_root, val_im_anns=args.val_im_anns,
              false_analysis_path=args.false_analysis_path)

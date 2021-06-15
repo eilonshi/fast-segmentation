@@ -4,6 +4,7 @@ import random
 import logging
 import argparse
 import numpy as np
+import yaml
 from tabulate import tabulate
 
 import torch
@@ -43,7 +44,8 @@ def parse_args() -> argparse.Namespace:
     parse.add_argument('--local_rank', dest='local_rank', type=int, default=0)
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
-    parse.add_argument('--finetune-from', type=str, default='../../models/3/best_model.pth')
+    parse.add_argument('--finetune-from', type=str,
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/3/best_model.pth')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--train_im_anns', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/train.txt')
@@ -61,18 +63,21 @@ def parse_args() -> argparse.Namespace:
     return parse.parse_args()
 
 
-def get_optimizer(model: nn.Module) -> torch.optim.Optimizer:
+def get_optimizer(net: nn.Module, lr_start, optimizer_betas, weight_decay) -> torch.optim.Optimizer:
     """
     Builds the optimizer for the given pytorch model
     Args:
-        model: a pytorch nn model
+        net: a pytorch nn model
+        weight_decay:
+        optimizer_betas:
+        lr_start:
 
     Returns:
         an Adam optimizer for the given model
     """
     wd_params, non_wd_params = [], []
 
-    for name, param in model.named_parameters():
+    for name, param in net.named_parameters():
         if param.dim() == 1:
             non_wd_params.append(param)
         elif param.dim() == 2 or param.dim() == 4:
@@ -82,22 +87,22 @@ def get_optimizer(model: nn.Module) -> torch.optim.Optimizer:
         {'params': wd_params},
         {'params': non_wd_params, 'weight_decay': 0}
     ]
-    optimizer = torch.optim.Adam(params_list, lr=cfg.lr_start, betas=cfg.optimizer_betas, weight_decay=cfg.weight_decay)
+    optimizer = torch.optim.Adam(params_list, lr=lr_start, betas=optimizer_betas, weight_decay=weight_decay)
 
     return optimizer
 
 
-def get_meters() -> Tuple[TimeMeter, AvgMeter, AvgMeter, List[AvgMeter]]:
+def get_meters(max_iter: int, num_aux_heads: int) -> Tuple[TimeMeter, AvgMeter, AvgMeter, List[AvgMeter]]:
     """
     Creates the meters of the time and the loss
 
     Returns:
         tuple of - (time meter, loss meter, main loss meter, auxiliary loss meter)
     """
-    time_meter = TimeMeter(cfg.max_iter)
+    time_meter = TimeMeter(max_iter)
     loss_meter = AvgMeter('loss')
     loss_pre_meter = AvgMeter('loss_prem')
-    loss_aux_meters = [AvgMeter('loss_aux{}'.format(i)) for i in range(cfg.num_aux_heads)]
+    loss_aux_meters = [AvgMeter('loss_aux{}'.format(i)) for i in range(num_aux_heads)]
 
     return time_meter, loss_meter, loss_pre_meter, loss_aux_meters
 
@@ -139,36 +144,44 @@ def save_best_model(cur_score: float, best_score: float, models_dir: str, net: n
 
 
 def save_evaluation_log(models_dir: str, logger: logging.Logger, net: nn.Module, writer: SummaryWriter, iteration: int,
-                        best_score: float) -> float:
+                        best_score: float, ims_per_gpu: int, crop_size: Tuple[int, int], log_path: str, im_root: str,
+                        val_im_anns: str, false_analysis_path: str, train_im_anns: str) -> float:
     """
     Saves a log with the SummaryWriter, and if the model is the best model until now, saves the model as the best model
 
     Args:
+        train_im_anns:
+        false_analysis_path:
+        val_im_anns:
+        im_root:
+        log_path:
         models_dir: path to the directory to save the model in, in case it is the best model
         logger: the logger that logs the evaluation log
         net: the pytorch network
         writer: the tensorboard summary writer
         iteration: the index of the current iteration
         best_score: the score of the best model until now
+        crop_size:
+        ims_per_gpu:
 
     Returns:
         the score of the best model
     """
-    log_pth = get_next_file_name(args.log_path, prefix='model_final_', suffix='.pth')
+    log_pth = get_next_file_name(log_path, prefix='model_final_', suffix='.pth')
     logger.info(f'\nevaluating the model \nsave models to {log_pth}')
 
     torch.cuda.empty_cache()
 
     # evaluate val set
-    heads_val, mious_val = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=args.im_root,
-                                      im_anns=args.val_im_anns, scales=cfg.scales, crop_size=cfg.crop_size,
-                                      false_analysis_path=args.false_analysis_path)
+    heads_val, mious_val = eval_model(net=net, ims_per_gpu=ims_per_gpu, im_root=im_root,
+                                      im_anns=val_im_anns, crop_size=crop_size,
+                                      false_analysis_path=false_analysis_path)
     log_ious(writer, mious_val, iteration, heads_val, logger, mode='val')
 
     # evaluate train set
-    heads_train, mious_train = eval_model(net=net, ims_per_gpu=cfg.ims_per_gpu, im_root=args.im_root,
-                                          im_anns=args.train_im_anns, scales=cfg.scales, crop_size=cfg.crop_size,
-                                          false_analysis_path=args.false_analysis_path)
+    heads_train, mious_train = eval_model(net=net, ims_per_gpu=ims_per_gpu, im_root=im_root,
+                                          im_anns=train_im_anns, crop_size=crop_size,
+                                          false_analysis_path=false_analysis_path)
     log_ious(writer, mious_train, iteration, heads_train, logger, mode='train')
 
     # save best model
@@ -195,9 +208,24 @@ def save_checkpoint(models_dir: str, net: nn.Module):
         torch.save(state, save_pth)
 
 
-def train():
+def train(ims_per_gpu: int, scales: Tuple, crop_size: Tuple[int, int], max_iter: int, use_sync_bn: bool,
+          num_aux_heads: int, warmup_iters: int, use_fp16: bool, message_iters: int, checkpoint_iters: int,
+          lr_start: float, optimizer_betas: Tuple[float, float], weight_decay: float, log_path, im_root, val_im_anns,
+          false_analysis_path, train_im_anns):
     """
     The main function for training the semantic segmentation model
+
+    Args:
+        ims_per_gpu:
+        scales:
+        num_aux_heads:
+        warmup_iters:
+        use_fp16:
+        message_iters:
+        checkpoint_iters:
+        use_sync_bn:
+        max_iter:
+        crop_size:
 
     Returns:
         None
@@ -209,16 +237,17 @@ def train():
     is_dist = dist.is_initialized()
 
     # set all components
-    data_loader = get_data_loader(args.im_root, args.train_im_anns, cfg.ims_per_gpu, cfg.scales, cfg.crop_size,
-                                  cfg.max_iter, mode='train', distributed=is_dist)
+    data_loader = get_data_loader(data_path=args.im_root, ann_path=args.train_im_anns, ims_per_gpu=ims_per_gpu,
+                                  scales=scales, crop_size=crop_size, max_iter=max_iter, mode='train',
+                                  distributed=is_dist)
     net = build_model(args.model, is_train=True, is_distributed=is_dist, pretrained_model_path=args.finetune_from,
-                      use_sync_bn=cfg.use_sync_bn)
+                      use_sync_bn=use_sync_bn)
     criteria_pre = SoftDiceLoss()
-    criteria_aux = [SoftDiceLoss() for _ in range(cfg.num_aux_heads)]
-    optimizer = get_optimizer(net)
+    criteria_aux = [SoftDiceLoss() for _ in range(num_aux_heads)]
+    optimizer = get_optimizer(net=net, lr_start=lr_start, optimizer_betas=optimizer_betas, weight_decay=weight_decay)
     scaler = amp.GradScaler()  # mixed precision training
-    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = get_meters()  # metrics
-    lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter_=cfg.max_iter, warmup_iter=cfg.warmup_iters,
+    time_meter, loss_meter, loss_pre_meter, loss_aux_meters = get_meters(max_iter=max_iter, num_aux_heads=num_aux_heads)
+    lr_scheduler = WarmupPolyLrScheduler(optimizer, power=0.9, max_iter_=max_iter, warmup_iter=warmup_iters,
                                          warmup_ratio=0.1, warmup='exp', last_epoch=-1, )
     best_score = 0
 
@@ -233,7 +262,7 @@ def train():
         label = torch.squeeze(label, 1)
         optimizer.zero_grad()
 
-        with amp.autocast(enabled=cfg.use_fp16):  # get main loss and auxiliary losses
+        with amp.autocast(enabled=use_fp16):  # get main loss and auxiliary losses
             logits, *logits_aux = net(image)
             loss_pre = criteria_pre(logits, label)
             loss_aux = [criteria(logits, label) for criteria, logits in zip(criteria_aux, logits_aux)]
@@ -252,14 +281,17 @@ def train():
         _ = [metric.update(loss.item()) for metric, loss in zip(loss_aux_meters, loss_aux)]
 
         # print training log message
-        if (iteration + 1) % cfg.message_iters == 0:
+        if (iteration + 1) % message_iters == 0:
             lr = lr_scheduler.get_lr()
             lr = sum(lr) / len(lr)
-            print_log_msg(iteration, cfg.max_iter, lr, time_meter, loss_meter, loss_pre_meter, loss_aux_meters)
+            print_log_msg(iteration, max_iter, lr, time_meter, loss_meter, loss_pre_meter, loss_aux_meters)
 
         # saving the model and evaluating it
-        if (iteration + 1) % cfg.checkpoint_iters == 0:
-            best_score = save_evaluation_log(models_dir, logger, net, writer, iteration, best_score)
+        if (iteration + 1) % checkpoint_iters == 0:
+            best_score = save_evaluation_log(models_dir, logger, net, writer, iteration, best_score,
+                                             ims_per_gpu=ims_per_gpu, crop_size=crop_size, log_path=log_path,
+                                             im_root=im_root, val_im_anns=val_im_anns,
+                                             false_analysis_path=false_analysis_path, train_im_anns=train_im_anns)
             save_checkpoint(models_dir, net)
 
         lr_scheduler.step()
@@ -271,7 +303,9 @@ def train():
 if __name__ == "__main__":
 
     args = parse_args()
-    cfg = cfg_factory[args.model]
+
+    with open('/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml') as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     torch.cuda.empty_cache()
     torch.cuda.set_device(args.local_rank)
@@ -287,4 +321,9 @@ if __name__ == "__main__":
 
     setup_logger('{}-train'.format(args.model), args.log_path)
 
-    train()
+    train(ims_per_gpu=cfg['ims_per_gpu'], scales=cfg['scales'], crop_size=cfg['crop_size'], max_iter=cfg['max_iter'],
+          use_sync_bn=cfg['use_sync_bn'], num_aux_heads=cfg['num_aux_heads'], warmup_iters=cfg['warmup_iters'],
+          use_fp16=cfg['use_fp16'], message_iters=cfg['message_iters'], checkpoint_iters=cfg['checkpoint_iters'],
+          lr_start=cfg['lr_start'], optimizer_betas=cfg['optimizer_betas'], weight_decay=cfg['weight_decay'],
+          log_path=args.log_path, im_root=args.im_root, val_im_anns=args.val_im_anns,
+          false_analysis_path=args.false_analysis_path, train_im_anns=args.train_im_anns)

@@ -41,6 +41,8 @@ def parse_args():
                        default='/home/bina/PycharmProjects/fast-segmentation/logs/regular_logs')
     parse.add_argument('--port', dest='port', type=int, default=44553, )
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
+    parse.add_argument('--config_path', type=str,
+                       default='/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml')
 
     return parse.parse_args()
 
@@ -303,7 +305,7 @@ def evaluate(ims_per_gpu, crop_size, weight_pth, model_type, im_root, val_im_ann
 if __name__ == "__main__":
     args = parse_args()
 
-    with open('/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml') as f:
+    with open(args.config_path) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     if not args.local_rank == -1:

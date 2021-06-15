@@ -121,7 +121,7 @@ class ColorJitter(object):
 
 
 class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
+    """Convert numpy arrays in sample to Tensors."""
 
     def __init__(self, mean=MEAN, std=STD):
         self.mean = mean

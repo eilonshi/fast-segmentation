@@ -8,7 +8,6 @@ from typing import Tuple
 
 import yaml
 
-from src.fast_segmentation.configs import cfg_factory
 from src.fast_segmentation.model_components.data_cv2 import TransformationVal
 from src.fast_segmentation.model_components.transform_cv2 import ToTensor
 from src.fast_segmentation.main.utils import build_model
@@ -33,6 +32,8 @@ def parse_args():
     parse.add_argument('--demo_im_anns', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/demo.txt')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
+    parse.add_argument('--config_path', type=str,
+                       default='/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml')
 
     return parse.parse_args()
 
@@ -137,7 +138,7 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, demo_path: s
 if __name__ == '__main__':
     args = parse_args()
 
-    with open('/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml') as f:
+    with open(args.config_path) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)

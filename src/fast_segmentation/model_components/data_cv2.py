@@ -4,7 +4,7 @@ import cv2
 import torch
 import torch.distributed as dist
 from torch.utils.data import Dataset, DataLoader
-from typing import Tuple, List
+from typing import Tuple
 
 from src.fast_segmentation.model_components import transform_cv2 as t
 

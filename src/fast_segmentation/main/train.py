@@ -16,7 +16,6 @@ from typing import Tuple, List
 import torch.nn as nn
 
 from evaluate import eval_model
-from src.fast_segmentation.configs import cfg_factory
 from src.fast_segmentation.main.utils import get_next_dir_name, get_next_file_name, build_model
 from src.fast_segmentation.model_components.data_cv2 import get_data_loader
 from src.fast_segmentation.model_components.soft_dice_loss import SoftDiceLoss
@@ -58,6 +57,9 @@ def parse_args() -> argparse.Namespace:
     parse.add_argument('--tensorboard_path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/logs/tensorboard_logs')
     parse.add_argument('--models_path', type=str, default='/home/bina/PycharmProjects/fast-segmentation/models')
+    parse.add_argument('--config_path', type=str,
+                       default='/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml')
+
     parse.add_argument('--amp', type=bool, default=True)
 
     return parse.parse_args()
@@ -210,12 +212,20 @@ def save_checkpoint(models_dir: str, net: nn.Module):
 
 def train(ims_per_gpu: int, scales: Tuple, crop_size: Tuple[int, int], max_iter: int, use_sync_bn: bool,
           num_aux_heads: int, warmup_iters: int, use_fp16: bool, message_iters: int, checkpoint_iters: int,
-          lr_start: float, optimizer_betas: Tuple[float, float], weight_decay: float, log_path, im_root, val_im_anns,
-          false_analysis_path, train_im_anns):
+          lr_start: float, optimizer_betas: Tuple[float, float], weight_decay: float, log_path: str, im_root: str,
+          val_im_anns: str, false_analysis_path: str, train_im_anns: str):
     """
     The main function for training the semantic segmentation model
 
     Args:
+        train_im_anns:
+        false_analysis_path:
+        val_im_anns:
+        im_root:
+        log_path:
+        weight_decay:
+        optimizer_betas:
+        lr_start:
         ims_per_gpu:
         scales:
         num_aux_heads:
@@ -304,7 +314,7 @@ if __name__ == "__main__":
 
     args = parse_args()
 
-    with open('/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml') as f:
+    with open(args.config_path) as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     torch.cuda.empty_cache()

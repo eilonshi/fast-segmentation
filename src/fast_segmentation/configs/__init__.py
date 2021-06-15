@@ -1,4 +1,4 @@
-from src.configs.cfg_bisenetv2 import cfg as bisenetv2_cfg
+from src.fast_segmentation.configs.cfg_bisenetv2 import cfg as bisenetv2_cfg
 
 
 class ConfigDict(object):

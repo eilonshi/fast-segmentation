@@ -3,8 +3,8 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
-from src.model_components.architectures import model_factory
-from src.main.consts import NUM_CLASSES
+from src.fast_segmentation.model_components.architectures import model_factory
+from src.fast_segmentation.main.consts import NUM_CLASSES
 
 
 def get_next_dir_name(root_dir: str) -> str:

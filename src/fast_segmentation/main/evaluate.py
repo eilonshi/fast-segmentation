@@ -12,11 +12,11 @@ import torch.nn as nn
 import torch.nn.functional as f
 import torch.distributed as dist
 
-from src.configs import cfg_factory
-from src.model_components.architectures import model_factory
-from src.model_components.data_cv2 import get_data_loader
-from src.model_components.logger import setup_logger
-from src.main.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
+from src.fast_segmentation.configs import cfg_factory
+from src.fast_segmentation.model_components.architectures import model_factory
+from src.fast_segmentation.model_components.data_cv2 import get_data_loader
+from src.fast_segmentation.model_components.logger import setup_logger
+from src.fast_segmentation.main.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
 
 
 def parse_args():

@@ -6,11 +6,11 @@ import cv2
 import matplotlib.pyplot as plt
 from typing import Tuple
 
-from src.configs import cfg_factory
-from src.model_components.data_cv2 import TransformationVal
-from src.model_components.transform_cv2 import ToTensor
-from src.main.utils import build_model
-from src.visualization.visualize import save_labels_mask_with_legend
+from src.fast_segmentation.configs import cfg_factory
+from src.fast_segmentation.model_components.data_cv2 import TransformationVal
+from src.fast_segmentation.model_components.transform_cv2 import ToTensor
+from src.fast_segmentation.main.utils import build_model
+from src.fast_segmentation.visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
 

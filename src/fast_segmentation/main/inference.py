@@ -102,7 +102,7 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
     return image_tensor
 
 
-def inference(image: np.ndarray, model_type: str, weight_path: str, demo_path: str, crop_size: Tuple[int, int],
+def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: Tuple[int, int], demo_path: str = None,
               label: np.ndarray = None):
     """
     The main function that responsible of applying the semantic segmentation model on the given image, the result is
@@ -117,7 +117,7 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, demo_path: s
         label: optional - an annotation mask to save next to the result
 
     Returns:
-        None
+        the prediction - the output of the network, mask in shape WxH (with values in range (0, NUM_CLASSES-1))
     """
     net = build_model(model_type=model_type, is_distributed=False, pretrained_model_path=weight_path,
                       is_train=False, use_sync_bn=False)
@@ -129,10 +129,13 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, demo_path: s
     out = logits[:1].argmax(dim=1).squeeze().detach().cpu().numpy()
 
     # save image, label and inference
-    plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
-    if label is not None:
-        save_labels_mask_with_legend(mask=label, save_path=os.path.join(demo_path, 'inf_label.jpg'))
+    if demo_path is not None:
+        plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
+        if label is not None:
+            save_labels_mask_with_legend(mask=label, save_path=os.path.join(demo_path, 'inf_label.jpg'))
+
+    return out
 
 
 if __name__ == '__main__':

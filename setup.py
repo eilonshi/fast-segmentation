@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="fast-segmentation",
-    version="0.0.4.4",
+    version="0.0.4.5",
     author="Eilon Shimony",
     author_email="eilonshi@gmail.com",
     description="A package for fast segmentation algorithm",

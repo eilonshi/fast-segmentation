@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from ..main.consts import NUM_CLASSES
+from fast_segmentation.core.consts import NUM_CLASSES
 
 
 class SoftDiceLoss(nn.Module):

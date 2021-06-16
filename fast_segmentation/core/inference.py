@@ -8,10 +8,10 @@ from typing import Tuple
 
 import yaml
 
-from ..model_components.data_cv2 import TransformationVal
-from ..model_components.transform_cv2 import ToTensor
-from ..main.utils import build_model
-from ..visualization.visualize import save_labels_mask_with_legend
+from fast_segmentation.model_components.data_cv2 import TransformationVal
+from fast_segmentation.model_components.transform_cv2 import ToTensor
+from fast_segmentation.core.utils import build_model
+from fast_segmentation.visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
 

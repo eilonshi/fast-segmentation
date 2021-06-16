@@ -4,7 +4,7 @@ import cv2
 import torch
 from typing import Tuple
 
-from ..model_components.consts import MEAN, STD
+from fast_segmentation.model_components.consts import MEAN, STD
 
 
 class RandomResizedCrop(object):

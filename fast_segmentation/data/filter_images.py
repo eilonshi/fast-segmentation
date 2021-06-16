@@ -148,7 +148,7 @@ if __name__ == '__main__':
     filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
 
     # BARAK
-    base_path = '../../../data/barak'
+    base_path = '../../data/barak'
     old_img_folder = os.path.join(base_path, 'images')
     new_img_folder = os.path.join(base_path, 'relevant_images')
     old_ann_folder = os.path.join(base_path, 'annotations')
@@ -158,7 +158,7 @@ if __name__ == '__main__':
     filter_data_folder(mapping_dict, irrelevant_labels, old_ann_folder, new_ann_folder, old_img_folder, new_img_folder)
 
     # create train, val, test txt files
-    base_path = '../../../data'
+    base_path = '../../data'
 
     data_dirs = [
         'ADE20k_outdoors',

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from fast_segmentation.main.consts import NUM_CLASSES
+from ..main.consts import NUM_CLASSES
 
 
 class ConvBNReLU(nn.Module):

@@ -16,12 +16,12 @@ from typing import Tuple, List
 import torch.nn as nn
 
 from evaluate import eval_model
-from fast_segmentation.main.utils import get_next_dir_name, get_next_file_name, build_model
-from fast_segmentation.model_components.data_cv2 import get_data_loader
-from fast_segmentation.model_components.soft_dice_loss import SoftDiceLoss
-from fast_segmentation.model_components.lr_scheduler import WarmupPolyLrScheduler
-from fast_segmentation.model_components.meters import TimeMeter, AvgMeter
-from fast_segmentation.model_components.logger import setup_logger, print_log_msg
+from ..main.utils import get_next_dir_name, get_next_file_name, build_model
+from ..model_components.data_cv2 import get_data_loader
+from ..model_components.soft_dice_loss import SoftDiceLoss
+from ..model_components.lr_scheduler import WarmupPolyLrScheduler
+from ..model_components.meters import TimeMeter, AvgMeter
+from ..model_components.logger import setup_logger, print_log_msg
 
 # fix all random seeds
 torch.manual_seed(123)
@@ -44,12 +44,12 @@ def parse_args() -> argparse.Namespace:
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--finetune-from', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/models/3/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/5/best_model.pth')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--train_im_anns', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/train.txt')
     parse.add_argument('--val_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/data/train_small.txt')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/val.txt')
     parse.add_argument('--log_path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/logs/regular_logs')
     parse.add_argument('--false_analysis_path', type=str,

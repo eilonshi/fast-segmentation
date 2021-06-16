@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from matplotlib.patches import Rectangle
 from typing import List, Tuple
 
-from fast_segmentation.main.consts import LABEL_TO_COLOR, IGNORE_LABEL, OTHER_LABEL, PIXELS_SCALE
+from ..main.consts import LABEL_TO_COLOR, IGNORE_LABEL, OTHER_LABEL, PIXELS_SCALE
 
 
 def labels_mask_to_colored_image(mask: np.ndarray) -> np.ndarray:
@@ -49,10 +49,16 @@ def save_image_with_legends_and_labels(save_path: str, image: np.ndarray, legend
     Returns:
         None
     """
-    plt.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    plt.legend(legends, labels)
-    plt.axis('off')
+    f, ax = plt.subplots()
+
+    ax.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    ax.legend(legends, labels)
+    ax.axis('off')
+
+    ax.plot()
     plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
+
+    return ax
 
 
 def save_labels_mask_with_legend(mask: np.ndarray, save_path: str):
@@ -71,4 +77,6 @@ def save_labels_mask_with_legend(mask: np.ndarray, save_path: str):
     labels = list(LABEL_TO_COLOR.keys())
     legends = get_legends(list(LABEL_TO_COLOR.values()))
 
-    save_image_with_legends_and_labels(save_path, image, legends, labels)
+    ax = save_image_with_legends_and_labels(save_path, image, legends, labels)
+
+    return ax

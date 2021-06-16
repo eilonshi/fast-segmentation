@@ -8,10 +8,10 @@ from typing import Tuple
 
 import yaml
 
-from fast_segmentation.model_components.data_cv2 import TransformationVal
-from fast_segmentation.model_components.transform_cv2 import ToTensor
-from fast_segmentation.main.utils import build_model
-from fast_segmentation.visualization.visualize import save_labels_mask_with_legend
+from ..model_components.data_cv2 import TransformationVal
+from ..model_components.transform_cv2 import ToTensor
+from ..main.utils import build_model
+from ..visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
 
@@ -26,7 +26,7 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/models/5/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/8/best_model.pth')
     parse.add_argument('--demo-path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/inference_results')
     parse.add_argument('--demo_im_anns', type=str,
@@ -103,12 +103,13 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
 
 
 def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: Tuple[int, int], demo_path: str = None,
-              label: np.ndarray = None):
+              label: np.ndarray = None, plot=False):
     """
     The main function that responsible of applying the semantic segmentation model on the given image, the result is
     saved to the corresponding paths
 
     Args:
+        plot:
         crop_size:
         weight_path:
         demo_path:
@@ -131,7 +132,12 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: T
     # save image, label and inference
     if demo_path is not None:
         plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
+        ax = save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
+
+        if plot:
+            ax.plot()
+            plt.show()
+
         if label is not None:
             save_labels_mask_with_legend(mask=label, save_path=os.path.join(demo_path, 'inf_label.jpg'))
 

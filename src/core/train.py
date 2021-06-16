@@ -16,12 +16,12 @@ from typing import Tuple, List
 import torch.nn as nn
 
 from evaluate import eval_model
-from fast_segmentation.core.utils import get_next_dir_name, get_next_file_name, build_model
-from fast_segmentation.model_components.data_cv2 import get_data_loader
-from fast_segmentation.model_components.soft_dice_loss import SoftDiceLoss
-from fast_segmentation.model_components.lr_scheduler import WarmupPolyLrScheduler
-from fast_segmentation.model_components.meters import TimeMeter, AvgMeter
-from fast_segmentation.model_components.logger import setup_logger, print_log_msg
+from src.core.utils import get_next_dir_name, get_next_file_name, build_model
+from src.model_components.data_cv2 import get_data_loader
+from src.model_components.soft_dice_loss import SoftDiceLoss
+from src.model_components.lr_scheduler import WarmupPolyLrScheduler
+from src.model_components.meters import TimeMeter, AvgMeter
+from src.model_components.logger import setup_logger, print_log_msg
 
 # fix all random seeds
 torch.manual_seed(123)

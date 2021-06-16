@@ -14,10 +14,10 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.distributed as dist
 
-from fast_segmentation.model_components.architectures import model_factory
-from fast_segmentation.model_components.data_cv2 import get_data_loader
-from fast_segmentation.model_components.logger import setup_logger
-from fast_segmentation.core.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
+from src.model_components.architectures import model_factory
+from src.model_components.data_cv2 import get_data_loader
+from src.model_components.logger import setup_logger
+from src.core.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
 
 
 def parse_args():

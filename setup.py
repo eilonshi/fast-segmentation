@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="fast-segmentation",
-    version="0.0.4.4",
+    version='0.0.4.7',
     author="Eilon Shimony",
     author_email="eilonshi@gmail.com",
     description="A package for fast segmentation algorithm",
@@ -21,7 +21,6 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    package_dir={"": "fast_segmentation"},
-    packages=setuptools.find_packages(where="fast_segmentation"),
+    packages=setuptools.find_packages(),
     python_requires=">=3.6",
 )

@@ -8,6 +8,7 @@ from typing import Tuple
 
 import yaml
 
+from src.core.consts import STANDARD_CROP_SIZE
 from src.model_components.data_cv2 import TransformationVal
 from src.model_components.transform_cv2 import ToTensor
 from src.core.utils import build_model
@@ -102,8 +103,8 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
     return image_tensor
 
 
-def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: Tuple[int, int], demo_path: str = None,
-              label: np.ndarray = None, plot=False) -> np.ndarray:
+def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: Tuple[int, int] = STANDARD_CROP_SIZE,
+              demo_path: str = None, label: np.ndarray = None, plot=False) -> np.ndarray:
     """
     The main function that responsible of applying the semantic segmentation model on the given image, the result is
     saved to the corresponding paths
@@ -123,11 +124,13 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: T
     net = build_model(model_type=model_type, is_distributed=False, pretrained_model_path=weight_path,
                       is_train=False, use_sync_bn=False)
 
-    image_tensor = preprocess_image(image, crop_size=crop_size)
+    image_tensor = preprocess_image(image=image, crop_size=crop_size)
 
     # get output from logits
     logits, *logits_aux = net(image_tensor)
     out = logits[:1].argmax(dim=1).squeeze().detach().cpu().numpy()
+    original_shape = (image.shape[1], image.shape[0])
+    out = cv2.resize(src=out, dsize=original_shape, interpolation=cv2.INTER_NEAREST)
 
     # save image, label and inference
     if demo_path is not None:

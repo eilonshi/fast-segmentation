@@ -21,6 +21,21 @@ def labels_mask_to_colored_image(mask: np.ndarray) -> np.ndarray:
     return np.asarray(list(LABEL_TO_COLOR.values()), dtype=np.uint8)[mask]
 
 
+def put_colored_annotation_on_image(image: np.ndarray, annotation: np.ndarray, opacity: float = 0.5) -> np.ndarray:
+    """
+    Creates an image with annotation on it
+
+    Args:
+        image: the original image in RGB format
+        annotation: colored annotation mask in RGB format
+        opacity: the amount of opacity to use in the visualization
+
+    Returns:
+        the combination of the image and the annotation
+    """
+    return (((1 - opacity) * image) + (opacity * annotation)).astype("uint8")
+
+
 def get_legends(colors: List[Tuple[int]]) -> List[Rectangle]:
     """
     Creates colored rects for legends of image

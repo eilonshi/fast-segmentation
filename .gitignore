@@ -123,3 +123,6 @@ src/tensorrt/build/*
 
 # tensorboard logs
 *.0
+
+.idea
+build

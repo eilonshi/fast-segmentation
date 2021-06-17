@@ -36,7 +36,8 @@ def get_legends(colors: List[Tuple[int]]) -> List[Rectangle]:
     return legends
 
 
-def save_image_with_legends_and_labels(save_path: str, image: np.ndarray, legends: List[Rectangle], labels: List[str]):
+def save_image_with_legends_and_labels(save_path: str, image: np.ndarray, legends: List[Rectangle],
+                                       labels: List[str]) -> (plt.Figure, plt.Axes):
     """
     Saves the given image with the given legends rects and labels
 
@@ -47,21 +48,21 @@ def save_image_with_legends_and_labels(save_path: str, image: np.ndarray, legend
         labels: a list of the names of the legends
 
     Returns:
-        None
+        the figure and the axes of matplotlib
     """
-    f, ax = plt.subplots()
+    figure, axes = plt.subplots()
 
-    ax.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    ax.legend(legends, labels)
-    ax.axis('off')
+    axes.imshow(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    axes.legend(legends, labels)
+    axes.axis('off')
 
-    ax.plot()
+    axes.plot()
     plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
 
-    return ax
+    return figure, axes
 
 
-def save_labels_mask_with_legend(mask: np.ndarray, save_path: str):
+def save_labels_mask_with_legend(mask: np.ndarray, save_path: str) -> (plt.Figure, plt.Axes):
     """
     Converts the mask to a colored rgb mask and saves the new mask to the given path
 
@@ -70,13 +71,13 @@ def save_labels_mask_with_legend(mask: np.ndarray, save_path: str):
         save_path: the path to save the new mask
 
     Returns:
-        None
+        the figure and the axes of matplotlib
     """
     mask[mask == IGNORE_LABEL] = OTHER_LABEL
     image = labels_mask_to_colored_image(mask)
     labels = list(LABEL_TO_COLOR.keys())
     legends = get_legends(list(LABEL_TO_COLOR.values()))
 
-    ax = save_image_with_legends_and_labels(save_path, image, legends, labels)
+    figure, axes = save_image_with_legends_and_labels(save_path, image, legends, labels)
 
-    return ax
+    return figure, axes

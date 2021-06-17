@@ -135,10 +135,10 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: T
     # save image, label and inference
     if demo_path is not None:
         plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        ax = save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
+        figure, axes = save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
 
         if plot:
-            ax.plot()
+            axes.plot()
             plt.show()
 
         if label is not None:

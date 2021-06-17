@@ -12,7 +12,6 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/eilonshi/fast-segmentation",
-    download_url="https://github.com/eilonshi/fast-segmentation/archive/refs/tags/0.0.3.5.tar.gz",
     project_urls={
         "Bug Tracker": "https://github.com/eilonshi/fast-segmentation/issues",
     },

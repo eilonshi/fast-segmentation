@@ -15,12 +15,12 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.distributed as dist
 
-from src.core.utils import get_next_file_name, delete_directory_content
-from src.model_components.architectures import model_factory
-from src.model_components.data_cv2 import get_data_loader
-from src.model_components.logger import setup_logger
-from src.core.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
-from src.visualization.visualize import save_labels_mask_with_legend
+from fast_segmentation.core.utils import get_next_file_name, delete_directory_content
+from fast_segmentation.model_components.architectures import model_factory
+from fast_segmentation.model_components.data_cv2 import get_data_loader
+from fast_segmentation.model_components.logger import setup_logger
+from fast_segmentation.core.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
+from fast_segmentation.visualization.visualize import save_labels_mask_with_legend
 
 
 def parse_args():

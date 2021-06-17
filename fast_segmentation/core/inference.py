@@ -8,11 +8,11 @@ from typing import Tuple
 
 import yaml
 
-from src.core.consts import STANDARD_CROP_SIZE
-from src.model_components.data_cv2 import TransformationVal
-from src.model_components.transform_cv2 import ToTensor
-from src.core.utils import build_model
-from src.visualization.visualize import save_labels_mask_with_legend
+from fast_segmentation.core.consts import STANDARD_CROP_SIZE
+from fast_segmentation.model_components.data_cv2 import TransformationVal
+from fast_segmentation.model_components.transform_cv2 import ToTensor
+from fast_segmentation.core.utils import build_model
+from fast_segmentation.visualization.visualize import save_labels_mask_with_legend
 
 torch.set_grad_enabled(False)
 

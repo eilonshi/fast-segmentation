@@ -107,7 +107,7 @@ venv.bak/
 play.py
 preprocess_data.py
 adj.md
-src/tensorrt/build/*
+fast_segmentation/tensorrt/build/*
 
 
 # weights

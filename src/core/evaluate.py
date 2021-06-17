@@ -6,6 +6,7 @@ import math
 
 import yaml
 from tabulate import tabulate
+from torch.utils.data import Dataset
 from tqdm import tqdm
 from typing import Tuple, List
 
@@ -14,10 +15,12 @@ import torch.nn as nn
 import torch.nn.functional as functional
 import torch.distributed as dist
 
+from src.core.utils import get_next_file_name, delete_directory_content
 from src.model_components.architectures import model_factory
 from src.model_components.data_cv2 import get_data_loader
 from src.model_components.logger import setup_logger
 from src.core.consts import IGNORE_LABEL, NUM_CLASSES, BAD_IOU
+from src.visualization.visualize import save_labels_mask_with_legend
 
 
 def parse_args():
@@ -31,10 +34,10 @@ def parse_args():
     parse.add_argument('--local_rank', dest='local_rank',
                        type=int, default=-1)
     parse.add_argument('--weight-path', dest='weight_pth', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/models/5/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/8/best_model.pth')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--val_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/data/train_small.txt')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/val.txt')
     parse.add_argument('--false_analysis_path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/false_analysis')
     parse.add_argument('--log_path', type=str,
@@ -107,8 +110,8 @@ class MscEvalV0(object):
 
 class MscEvalCrop(object):
 
-    def __init__(self, crop_size, crop_stride, false_analysis_path, flip=True, scales=(0.5, 0.75, 1, 1.25, 1.5, 1.75),
-                 label_ignore=255):
+    def __init__(self, crop_size: Tuple[int, int], crop_stride: int, false_analysis_path: str, flip: bool = True,
+                 scales: Tuple = (0.5, 0.75, 1, 1.25, 1.5, 1.75), label_ignore: int = IGNORE_LABEL):
 
         self.scales = scales
         self.ignore_label = label_ignore
@@ -120,7 +123,7 @@ class MscEvalCrop(object):
 
         self.false_analysis_path = false_analysis_path
 
-    def pad_tensor(self, in_tensor):
+    def pad_tensor(self, in_tensor: torch.Tensor):
         n, c, h, w = in_tensor.size()
         crop_h, crop_w = self.crop_size
 
@@ -138,7 +141,7 @@ class MscEvalCrop(object):
 
         return out_tensor, [hst, hed, wst, wed]
 
-    def eval_chip(self, net, crop):
+    def eval_chip(self, net: nn.Module, crop: torch.Tensor):
         prob = net(crop)[0].softmax(dim=1)
 
         if self.flip:
@@ -148,7 +151,7 @@ class MscEvalCrop(object):
 
         return prob
 
-    def crop_eval(self, net, im, n_classes):
+    def crop_eval(self, net: nn.Module, im: torch.Tensor, n_classes: int):
         crop_h, crop_w = self.crop_size
         stride_rate = self.crop_stride
         im, indices = self.pad_tensor(im)
@@ -174,7 +177,7 @@ class MscEvalCrop(object):
 
         return prob
 
-    def scale_crop_eval(self, net, im, scale, n_classes):
+    def scale_crop_eval(self, net: nn.Module, im: torch.Tensor, scale: Tuple, n_classes: int):
         n, c, h, w = im.size()
         new_hw = [int(h * scale), int(w * scale)]
         im = functional.interpolate(im, new_hw, mode='bilinear', align_corners=True)
@@ -184,29 +187,29 @@ class MscEvalCrop(object):
         return prob
 
     @torch.no_grad()
-    def __call__(self, net, dl, n_classes):
+    def __call__(self, net: nn.Module, dl: Dataset, n_classes: int):
         data_loader = dl if self.distributed and not dist.get_rank() == 0 else tqdm(dl)
 
         hist = torch.zeros(n_classes, n_classes).cuda().detach()
         hist.requires_grad_(False)
 
-        for i, (imgs, label) in enumerate(data_loader):
-            imgs = imgs.cuda()
-            label = label.squeeze(1).cuda()
-            n, h, w = label.shape
+        for i, (images, labels) in enumerate(data_loader):
+            images = images.cuda()
+            labels = labels.squeeze(1).cuda()
+            n, h, w = labels.shape
             probs = torch.zeros((n, n_classes, h, w)).cuda()
             probs.requires_grad_(False)
 
             for sc in self.scales:
-                probs += self.scale_crop_eval(net, imgs, sc, n_classes)
+                probs += self.scale_crop_eval(net, images, sc, n_classes)
 
             torch.cuda.empty_cache()
             preds = torch.argmax(probs, dim=1)
 
-            keep = label != self.ignore_label
+            keep = labels != self.ignore_label
             cur_hist = torch.zeros(n_classes, n_classes).cuda().detach()
 
-            bin_count = torch.bincount(label[keep] * n_classes + preds[keep], minlength=n_classes ** 2). \
+            bin_count = torch.bincount(labels[keep] * n_classes + preds[keep], minlength=n_classes ** 2). \
                 view(n_classes, n_classes)
             cur_hist += bin_count
             cur_miou = hist.diag() / (hist.sum(dim=0) + hist.sum(dim=1) - hist.diag())
@@ -214,7 +217,7 @@ class MscEvalCrop(object):
             cur_miou = cur_miou.mean()
 
             if cur_miou < BAD_IOU:
-                save_in_false_analysis(imgs, self.false_analysis_path)
+                save_in_false_analysis(preds=preds, labels=labels, path=self.false_analysis_path)
 
             hist += bin_count
 
@@ -228,17 +231,18 @@ class MscEvalCrop(object):
         return miou.item()
 
 
-def save_in_false_analysis(images: torch.Tensor, path: str):
-    # TODO: write again this function
-    pass
+def save_in_false_analysis(preds: torch.Tensor, labels: torch.Tensor, path: str):
+    delete_directory_content(path)
 
-    # images_channels_last = images.permute([0, 2, 3, 1])
-    #
-    # for i, image in enumerate(images_channels_last):
-    #     image = image.detach().cpu().numpy()
-    #     file_name = os.path.join(path, f'img{i}.jpg')
-    #     print('filename', file_name)
-    #     save_labels_mask_with_legend(mask=image, save_path=file_name)
+    for i, (pred, label) in enumerate(zip(preds, labels)):
+        pred = pred.detach().cpu().numpy()
+        label = label.detach().cpu().numpy()
+
+        label_path = get_next_file_name(root_dir=path, prefix='label', suffix='.jpg')
+        pred_path = get_next_file_name(root_dir=path, prefix='pred', suffix='.jpg')
+
+        save_labels_mask_with_legend(mask=pred, save_path=pred_path)
+        save_labels_mask_with_legend(mask=label, save_path=label_path)
 
 
 @torch.no_grad()
@@ -282,7 +286,8 @@ def eval_model(net: nn.Module, ims_per_gpu: int, crop_size: Tuple[int, int], im_
     return heads, mious
 
 
-def evaluate(ims_per_gpu, crop_size, weight_pth, model_type, im_root, val_im_anns, false_analysis_path):
+def evaluate(ims_per_gpu: int, crop_size: Tuple[int, int], weight_pth: str, model_type: str, im_root: str,
+             val_im_anns: str, false_analysis_path: str):
     logger = logging.getLogger()
 
     # model

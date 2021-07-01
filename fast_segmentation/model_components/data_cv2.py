@@ -77,7 +77,7 @@ class TransformationVal(object):
     def __init__(self, crop_size):
         self.trans_func = t.Compose([
             t.RandomResizedCrop(size=crop_size, is_random=False),
-            t.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4)
+            t.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, is_random=False)
         ])
 
     def __call__(self, image_label):

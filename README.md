@@ -1,6 +1,7 @@
 # Fast Urban Semantic Segmentation 
 
 Our usage of [BiSeNetV2](https://arxiv.org/abs/1808.00897) for semantic segmentation in an urban images case
+You can install the package from [here](https://test.pypi.org/project/fast-segmentation/)
 
 ## platform
 My platform is like this: 

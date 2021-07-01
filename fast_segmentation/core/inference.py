@@ -104,7 +104,7 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
 
 
 def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: Tuple[int, int] = STANDARD_CROP_SIZE,
-              demo_path: str = None, label: np.ndarray = None, plot=False) -> np.ndarray:
+              demo_path: str = None, label: np.ndarray = None, plot: bool = False) -> np.ndarray:
     """
     The main function that responsible of applying the semantic segmentation model on the given image, the result is
     saved to the corresponding paths
@@ -155,4 +155,4 @@ if __name__ == '__main__':
 
     image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)
     inference(image=image_original, label=label_original, model_type=args.model, weight_path=args.weight_path,
-              demo_path=args.demo_path, crop_size=cfg['crop_size'])
+              demo_path=args.demo_path, crop_size=cfg['crop_size'], plot=True)

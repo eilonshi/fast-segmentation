@@ -12,7 +12,7 @@ from fast_segmentation.core.consts import STANDARD_CROP_SIZE
 from fast_segmentation.model_components.data_cv2 import TransformationVal
 from fast_segmentation.model_components.transform_cv2 import ToTensor
 from fast_segmentation.core.utils import build_model
-from fast_segmentation.visualization.visualize import save_labels_mask_with_legend
+from fast_segmentation.visualization.visualize import save_labels_mask_with_legend, labels_mask_to_colored_image
 
 torch.set_grad_enabled(False)
 
@@ -27,7 +27,7 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/models/8/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/10/best_model.pth')
     parse.add_argument('--demo-path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/inference_results')
     parse.add_argument('--demo_im_anns', type=str,
@@ -135,6 +135,10 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: T
     # save image, label and inference
     if demo_path is not None:
         plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        img_with_prediction = (0.5 * image + 0.5 *
+                               cv2.cvtColor(labels_mask_to_colored_image(out), cv2.COLOR_RGB2BGR)).astype(np.uint8)
+        plt.imsave(os.path.join(demo_path, 'inf_image_with_prediction.jpg'), img_with_prediction)
+
         figure, axes = save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
 
         if plot:

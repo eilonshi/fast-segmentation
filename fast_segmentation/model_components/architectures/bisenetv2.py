@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 from fast_segmentation.core.consts import NUM_CLASSES
+from fast_segmentation.model_components.architectures.consts import DROPOUT_PROB
 
 
 class ConvBNReLU(nn.Module):
@@ -20,6 +21,7 @@ class ConvBNReLU(nn.Module):
         feat = self.conv(x)
         feat = self.bn(feat)
         feat = self.relu(feat)
+
         return feat
 
 
@@ -35,6 +37,7 @@ class UpSample(nn.Module):
     def forward(self, x):
         feat = self.proj(x)
         feat = self.up(feat)
+
         return feat
 
     def init_weight(self):
@@ -87,6 +90,7 @@ class StemBlock(nn.Module):
         feat_right = self.right(feat)
         feat = torch.cat([feat_left, feat_right], dim=1)
         feat = self.fuse(feat)
+
         return feat
 
 
@@ -137,6 +141,7 @@ class GELayerS1(nn.Module):
         feat = self.conv2(feat)
         feat = feat + x
         feat = self.relu(feat)
+
         return feat
 
 
@@ -186,6 +191,7 @@ class GELayerS2(nn.Module):
         shortcut = self.shortcut(x)
         feat = feat + shortcut
         feat = self.relu(feat)
+
         return feat
 
 
@@ -216,6 +222,7 @@ class SegmentBranch(nn.Module):
         feat4 = self.S4(feat3)
         feat5_4 = self.S5_4(feat4)
         feat5_5 = self.S5_5(feat5_4)
+
         return feat2, feat3, feat4, feat5_4, feat5_5
 
 
@@ -270,10 +277,11 @@ class SegmentHead(nn.Module):
     def __init__(self, in_chan, mid_chan, n_classes, up_factor=8, aux=True):
         super(SegmentHead, self).__init__()
         self.conv = ConvBNReLU(in_chan, mid_chan, 3, stride=1)
-        self.drop = nn.Dropout(0.1)
+        self.drop = nn.Dropout(DROPOUT_PROB)
         self.up_factor = up_factor
 
         out_chan = n_classes * up_factor * up_factor
+
         if aux:
             self.conv_out = nn.Sequential(
                 ConvBNReLU(mid_chan, up_factor * up_factor, 3, stride=1),
@@ -290,6 +298,7 @@ class SegmentHead(nn.Module):
         feat = self.conv(x)
         feat = self.drop(feat)
         feat = self.conv_out(feat)
+
         return feat
 
 
@@ -316,15 +325,18 @@ class BiSeNetV2(nn.Module):
         feat_d = self.detail(x)
         feat2, feat3, feat4, feat5_4, feat_s = self.segment(x)
         feat_head = self.bga(feat_d, feat_s)
-
         logits = self.head(feat_head)
+
         if self.output_aux:
             logits_aux2 = self.aux2(feat2)
             logits_aux3 = self.aux3(feat3)
             logits_aux4 = self.aux4(feat4)
             logits_aux5_4 = self.aux5_4(feat5_4)
+
             return logits, logits_aux2, logits_aux3, logits_aux4, logits_aux5_4
+
         pred = logits.argmax(dim=1)
+
         return pred
 
     def init_weights(self):

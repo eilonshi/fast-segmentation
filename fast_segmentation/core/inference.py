@@ -31,7 +31,7 @@ def parse_args():
     parse.add_argument('--demo-path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/inference_results')
     parse.add_argument('--demo_im_anns', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/data/demo.txt')
+                       default='/home/bina/PycharmProjects/fast-segmentation/data/inference.txt')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--config_path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/configs/main_cfg.yaml')
@@ -94,9 +94,13 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
     image_label = {'image': image_rgb, 'label': label}
     image_label_cropped = TransformationVal(crop_size=crop_size)(image_label)
 
-    image_tensor = ToTensor()(image_label_cropped)['image']
+    image_tensor = ToTensor(normalize=False)(image_label_cropped)['image']
     image_tensor = torch.unsqueeze(image_tensor, 0)
     image_tensor = image_tensor.cuda()
+
+    image_to_show = image_tensor.squeeze().detach().cpu().numpy().transpose([1, 2, 0])
+    image_to_show = (image_to_show * 256).astype(np.uint8)
+    plt.imshow(image_to_show)
 
     # TODO: test that the processed image is the same as in the train
 
@@ -104,7 +108,7 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
 
 
 def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: Tuple[int, int] = STANDARD_CROP_SIZE,
-              demo_path: str = None, label: np.ndarray = None, plot: bool = False) -> np.ndarray:
+              inference_path: str = None, label: np.ndarray = None, plot: bool = False) -> np.ndarray:
     """
     The main function that responsible of applying the semantic segmentation model on the given image, the result is
     saved to the corresponding paths
@@ -113,7 +117,7 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: T
         plot:
         crop_size:
         weight_path:
-        demo_path:
+        inference_path:
         image: an image to run the segmentation model on
         model_type: the name of the model architecture type
         label: optional - an annotation mask to save next to the result
@@ -133,20 +137,20 @@ def inference(image: np.ndarray, model_type: str, weight_path: str, crop_size: T
     out = cv2.resize(src=out, dsize=original_shape, interpolation=cv2.INTER_NEAREST)
 
     # save image, label and inference
-    if demo_path is not None:
-        plt.imsave(os.path.join(demo_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    if inference_path is not None:
+        plt.imsave(os.path.join(inference_path, 'inf_image.jpg'), cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         img_with_prediction = (0.5 * image + 0.5 *
                                cv2.cvtColor(labels_mask_to_colored_image(out), cv2.COLOR_RGB2BGR)).astype(np.uint8)
-        plt.imsave(os.path.join(demo_path, 'inf_image_with_prediction.jpg'), img_with_prediction)
+        plt.imsave(os.path.join(inference_path, 'inf_image_with_prediction.jpg'), img_with_prediction)
 
-        figure, axes = save_labels_mask_with_legend(mask=out, save_path=os.path.join(demo_path, 'inf_result.jpg'))
+        figure, axes = save_labels_mask_with_legend(mask=out, save_path=os.path.join(inference_path, 'inf_result.jpg'))
 
         if plot:
             axes.plot()
             plt.show()
 
         if label is not None:
-            save_labels_mask_with_legend(mask=label, save_path=os.path.join(demo_path, 'inf_label.jpg'))
+            save_labels_mask_with_legend(mask=label, save_path=os.path.join(inference_path, 'inf_label.jpg'))
 
     return out
 
@@ -159,4 +163,4 @@ if __name__ == '__main__':
 
     image_original, label_original = read_image_and_label(demo_im_anns=args.demo_im_anns, im_root=args.im_root)
     inference(image=image_original, label=label_original, model_type=args.model, weight_path=args.weight_path,
-              demo_path=args.demo_path, crop_size=cfg['crop_size'], plot=True)
+              inference_path=args.demo_path, crop_size=cfg['crop_size'], plot=True)

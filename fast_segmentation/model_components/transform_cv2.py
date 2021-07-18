@@ -2,7 +2,7 @@ import math
 import numpy as np
 import cv2
 import torch
-from typing import Tuple
+from typing import Tuple, Dict
 
 from fast_segmentation.model_components.consts import MEAN, STD
 
@@ -124,21 +124,32 @@ class ColorJitter(object):
 class ToTensor(object):
     """Convert numpy arrays in sample to Tensors."""
 
-    def __init__(self, mean=MEAN, std=STD):
+    def __init__(self, mean=MEAN, std=STD, normalize: bool = True):
         self.mean = mean
         self.std = std
+        self.normalize = normalize
 
-    def __call__(self, image_label):
+    def __call__(self, image_label: Dict[str, np.ndarray]):
         image, label = image_label['image'], image_label['label']
         if label is not None:
             label = torch.from_numpy(label.astype(np.int64).copy()).clone()
 
-        image = image.transpose(2, 0, 1).astype(np.float32)
-        image = torch.from_numpy(image).div_(255)
-        dtype, device = image.dtype, image.device
-        mean = torch.as_tensor(self.mean, dtype=dtype, device=device)[:, None, None]
-        std = torch.as_tensor(self.std, dtype=dtype, device=device)[:, None, None]
-        image = image.sub_(mean).div_(std).clone()
+        if self.normalize:
+            image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+            image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+            image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+
+            image = image.transpose([2, 0, 1]).astype(np.float32)
+
+            image_std = np.std(image, axis=(1, 2))
+            std_division = image_std / self.std
+            image = image / std_division[:, None, None]
+
+            image_mean = np.mean(image, axis=(1, 2))
+            mean_sub = image_mean - self.mean
+            image = image - mean_sub[:, None, None]
+
+        image = torch.as_tensor(image, dtype=torch.float)
 
         return {'image': image, 'label': label}
 

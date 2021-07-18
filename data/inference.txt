@@ -1,0 +1,4 @@
+tevel_examples/tevel_3.png,tevel_examples/ann_3.png
+ADE20k_outdoors/relevant_images/ADE_train_00000562.png,ADE20k_outdoors/relevant_annotations/ADE_train_00000562.png
+cityscapes/relevant_images/aachen_000000_000019_gtFine_labelIds.png,cityscapes/relevant_annotations/aachen_000000_000019_gtFine_labelIds.png
+barak/relevant_images/IMG_100174_w.png,barak/relevant_annotations/IMG_100174_w.png

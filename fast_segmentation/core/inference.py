@@ -27,7 +27,7 @@ def parse_args():
     parse = argparse.ArgumentParser()
     parse.add_argument('--model', type=str, default='bisenetv2')
     parse.add_argument('--weight-path', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/models/10/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/21/best_model.pth')
     parse.add_argument('--demo-path', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/inference_results')
     parse.add_argument('--demo_im_anns', type=str,
@@ -97,10 +97,6 @@ def preprocess_image(image: np.ndarray, crop_size: Tuple[int, int]) -> torch.Ten
     image_tensor = ToTensor(normalize=False)(image_label_cropped)['image']
     image_tensor = torch.unsqueeze(image_tensor, 0)
     image_tensor = image_tensor.cuda()
-
-    image_to_show = image_tensor.squeeze().detach().cpu().numpy().transpose([1, 2, 0])
-    image_to_show = (image_to_show * 256).astype(np.uint8)
-    plt.imshow(image_to_show)
 
     # TODO: test that the processed image is the same as in the train
 

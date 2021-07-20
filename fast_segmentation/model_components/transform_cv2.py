@@ -134,13 +134,9 @@ class ToTensor(object):
         if label is not None:
             label = torch.from_numpy(label.astype(np.int64).copy()).clone()
 
+        image = image.transpose([2, 0, 1]).astype(np.float32)
+
         if self.normalize:
-            image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
-            image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
-            image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
-
-            image = image.transpose([2, 0, 1]).astype(np.float32)
-
             image_std = np.std(image, axis=(1, 2))
             std_division = image_std / self.std
             image = image / std_division[:, None, None]
@@ -148,6 +144,10 @@ class ToTensor(object):
             image_mean = np.mean(image, axis=(1, 2))
             mean_sub = image_mean - self.mean
             image = image - mean_sub[:, None, None]
+
+            image = np.clip(image, 0, 1)
+        else:
+            image = image / 255
 
         image = torch.as_tensor(image, dtype=torch.float)
 

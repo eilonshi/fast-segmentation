@@ -5,6 +5,7 @@ import logging
 import argparse
 import numpy as np
 import yaml
+from matplotlib import pyplot as plt
 from tabulate import tabulate
 
 import torch
@@ -44,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     parse.add_argument('--port', dest='port', type=int, default=44554)
     parse.add_argument('--model', dest='model', type=str, default='bisenetv2')
     parse.add_argument('--finetune-from', type=str,
-                       default='/home/bina/PycharmProjects/fast-segmentation/models/5/best_model.pth')
+                       default='/home/bina/PycharmProjects/fast-segmentation/models/21/best_model.pth')
     parse.add_argument('--im_root', type=str, default='/home/bina/PycharmProjects/fast-segmentation/data')
     parse.add_argument('--train_im_anns', type=str,
                        default='/home/bina/PycharmProjects/fast-segmentation/data/train.txt')
@@ -265,6 +266,11 @@ def train(ims_per_gpu: int, scales: Tuple, crop_size: Tuple[int, int], max_iter:
     for iteration, (image, label) in enumerate(data_loader):
         image = image.cuda()
         label = label.cuda()
+
+        # image_to_show = image[0].detach().cpu().numpy().transpose([1, 2, 0])
+        # image_to_show = (image_to_show * 255).astype(np.uint8)
+        # plt.imshow(image_to_show)
+        # plt.show()
 
         if iteration == 0:
             writer.add_graph(net, image)
